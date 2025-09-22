@@ -33,39 +33,197 @@
 <p align="center" style="color:grey;"><i>Get started with Kestra in 4 minutes.</i></p>
 
 
-# Kestra Plugin Template
+# Kestra DocumentDB Plugin
 
-> A template for creating Kestra plugins
+> Integrate with DocumentDB - Microsoft's open-source, MongoDB-compatible document database
 
-This repository serves as a general template for creating a new [Kestra](https://github.com/kestra-io/kestra) plugin. It should take only a few minutes! Use this repository as a scaffold to ensure that you've set up the plugin correctly, including unit tests and CI/CD workflows.
+This plugin provides integration with [DocumentDB](https://documentdb.io), Microsoft's open-source document database built on PostgreSQL. DocumentDB is now part of the Linux Foundation and offers MongoDB compatibility with the reliability and ecosystem of PostgreSQL.
+
+## Features
+
+- **Document Operations**: Insert single or multiple documents with automatic ID generation
+- **Advanced Querying**: Find documents with MongoDB-style filters and pagination
+- **Aggregation Pipelines**: Execute complex aggregation operations for data analysis
+- **MongoDB Compatibility**: Use familiar MongoDB query syntax and operators
+- **Flexible Output**: Support for FETCH, FETCH_ONE, STORE, and NONE output types
+- **PostgreSQL Backend**: Built on the reliability and performance of PostgreSQL
+- **Open Source**: Fully MIT-licensed with no vendor lock-in
+
+## Supported Operations
+
+| Operation | Description | Required Parameters |
+|-----------|-------------|-------------------|
+| `Insert` | Insert single or multiple documents | `connectionString`, `database`, `collection`, `username`, `password`, `document` or `documents` |
+| `Read` | Find documents with filtering and aggregation | `connectionString`, `database`, `collection`, `username`, `password`, optional: `filter`, `aggregationPipeline`, `limit`, `skip` |
 
 ![Kestra orchestrator](https://kestra.io/video.gif)
 
-## Running the project in local
+## Quick Start
+
+### Basic Configuration
+
+All tasks require these basic connection parameters:
+
+```yaml
+tasks:
+  - id: documentdb_task
+    type: io.kestra.plugin.documentdb.Insert
+    connectionString: "https://my-documentdb-instance.com"  # DocumentDB HTTP endpoint
+    database: "myapp"                                        # Database name
+    collection: "users"                                      # Collection name
+    username: "{{ secret('DOCUMENTDB_USERNAME') }}"         # Username
+    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"         # Password
+```
+
+### Example: Insert Single Document
+
+```yaml
+id: insert_user
+namespace: company.documentdb
+
+tasks:
+  - id: create_user
+    type: io.kestra.plugin.documentdb.Insert
+    connectionString: "https://my-documentdb-instance.com"
+    database: "myapp"
+    collection: "users"
+    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
+    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
+    document:
+      name: "John Doe"
+      email: "john.doe@example.com"
+      age: 30
+      created_at: "{{ now() }}"
+      roles: ["user", "editor"]
+```
+
+### Example: Insert Multiple Documents
+
+```yaml
+id: insert_products
+namespace: company.documentdb
+
+tasks:
+  - id: create_products
+    type: io.kestra.plugin.documentdb.Insert
+    connectionString: "https://my-documentdb-instance.com"
+    database: "inventory"
+    collection: "products"
+    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
+    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
+    documents:
+      - name: "Laptop"
+        price: 999.99
+        category: "Electronics"
+        in_stock: true
+      - name: "Mouse"
+        price: 29.99
+        category: "Electronics"
+        in_stock: false
+      - name: "Desk"
+        price: 299.99
+        category: "Furniture"
+        in_stock: true
+```
+
+### Example: Find Documents with Filters
+
+```yaml
+id: find_active_users
+namespace: company.documentdb
+
+tasks:
+  - id: query_users
+    type: io.kestra.plugin.documentdb.Read
+    connectionString: "https://my-documentdb-instance.com"
+    database: "myapp"
+    collection: "users"
+    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
+    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
+    filter:
+      status: "active"
+      age:
+        $gte: 18
+      roles:
+        $in: ["editor", "admin"]
+    limit: 100
+    fetchType: FETCH
+```
+
+### Example: Aggregation Pipeline
+
+```yaml
+id: user_statistics
+namespace: company.documentdb
+
+tasks:
+  - id: aggregate_users
+    type: io.kestra.plugin.documentdb.Read
+    connectionString: "https://my-documentdb-instance.com"
+    database: "myapp"
+    collection: "users"
+    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
+    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
+    aggregationPipeline:
+      - $match:
+          status: "active"
+      - $group:
+          _id: "$department"
+          count: { $sum: 1 }
+          avgAge: { $avg: "$age" }
+      - $sort:
+          count: -1
+    fetchType: FETCH
+```
+
+### Example: Get Single Document
+
+```yaml
+id: get_user
+namespace: company.documentdb
+
+tasks:
+  - id: find_user
+    type: io.kestra.plugin.documentdb.Read
+    connectionString: "https://my-documentdb-instance.com"
+    database: "myapp"
+    collection: "users"
+    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
+    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
+    filter:
+      email: "john.doe@example.com"
+    fetchType: FETCH_ONE
+```
+
+## Installation
+
+Add this plugin to your Kestra instance:
+
+```bash
+./kestra plugins install io.kestra.plugin:plugin-documentdb:LATEST
+```
+
+## Development
+
 ### Prerequisites
 - Java 21
 - Docker
 
 ### Running tests
-```
+```bash
 ./gradlew check --parallel
 ```
 
-### Development
+### Local Development
 
-`VSCode`:
+**VSCode**: Follow the README.md within the `.devcontainer` folder for development setup.
 
-Follow the README.md within the `.devcontainer` folder for a quick and easy way to get up and running with developing plugins if you are using VSCode.
-
-`Other IDEs`:
-
+**Other IDEs**:
+```bash
+./gradlew shadowJar && docker build -t kestra-documentdb . && docker run --rm -p 8080:8080 kestra-documentdb server local
 ```
-./gradlew shadowJar && docker build -t kestra-custom . && docker run --rm -p 8080:8080 kestra-custom server local
-```
-> [!NOTE]
-> You need to relaunch this whole command everytime you make a change to your plugin
 
-go to http://localhost:8080, your plugin will be available to use
+Visit http://localhost:8080 to test your plugin.
 
 ## Documentation
 * Full documentation can be found under: [kestra.io/docs](https://kestra.io/docs)
