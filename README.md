@@ -53,8 +53,8 @@ This plugin provides integration with [DocumentDB](https://documentdb.io), Micro
 
 | Operation | Description | Required Parameters |
 |-----------|-------------|-------------------|
-| `Insert` | Insert single or multiple documents | `connectionString`, `database`, `collection`, `username`, `password`, `document` or `documents` |
-| `Read` | Find documents with filtering and aggregation | `connectionString`, `database`, `collection`, `username`, `password`, optional: `filter`, `aggregationPipeline`, `limit`, `skip` |
+| `Insert` | Insert single or multiple documents | `host`, `database`, `collection`, `username`, `password`, `document` or `documents` |
+| `Read` | Find documents with filtering and aggregation | `host`, `database`, `collection`, `username`, `password`, optional: `filter`, `aggregationPipeline`, `limit`, `skip` |
 
 ![Kestra orchestrator](https://kestra.io/video.gif)
 
@@ -68,7 +68,7 @@ All tasks require these basic connection parameters:
 tasks:
   - id: documentdb_task
     type: io.kestra.plugin.documentdb.Insert
-    connectionString: "https://my-documentdb-instance.com"  # DocumentDB HTTP endpoint
+    host: "https://my-documentdb-instance.com"              # DocumentDB HTTP endpoint
     database: "myapp"                                        # Database name
     collection: "users"                                      # Collection name
     username: "{{ secret('DOCUMENTDB_USERNAME') }}"         # Username
@@ -84,7 +84,7 @@ namespace: company.documentdb
 tasks:
   - id: create_user
     type: io.kestra.plugin.documentdb.Insert
-    connectionString: "https://my-documentdb-instance.com"
+    host: "https://my-documentdb-instance.com"
     database: "myapp"
     collection: "users"
     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -106,7 +106,7 @@ namespace: company.documentdb
 tasks:
   - id: create_products
     type: io.kestra.plugin.documentdb.Insert
-    connectionString: "https://my-documentdb-instance.com"
+    host: "https://my-documentdb-instance.com"
     database: "inventory"
     collection: "products"
     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -135,7 +135,7 @@ namespace: company.documentdb
 tasks:
   - id: query_users
     type: io.kestra.plugin.documentdb.Read
-    connectionString: "https://my-documentdb-instance.com"
+    host: "https://my-documentdb-instance.com"
     database: "myapp"
     collection: "users"
     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -159,7 +159,7 @@ namespace: company.documentdb
 tasks:
   - id: aggregate_users
     type: io.kestra.plugin.documentdb.Read
-    connectionString: "https://my-documentdb-instance.com"
+    host: "https://my-documentdb-instance.com"
     database: "myapp"
     collection: "users"
     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -185,7 +185,7 @@ namespace: company.documentdb
 tasks:
   - id: find_user
     type: io.kestra.plugin.documentdb.Read
-    connectionString: "https://my-documentdb-instance.com"
+    host: "https://my-documentdb-instance.com"
     database: "myapp"
     collection: "users"
     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -210,9 +210,41 @@ Add this plugin to your Kestra instance:
 - Docker
 
 ### Running tests
+
+#### Integration Tests with Mock DocumentDB Server
+
+This plugin includes a test mock server (`api-server.py`) that simulates DocumentDB's REST API for testing purposes. The server bridges HTTP requests to MongoDB operations, providing a realistic testing environment without requiring a real DocumentDB instance.
+
+**Automatic Setup (Recommended):**
 ```bash
-./gradlew check --parallel
+# Setup test environment and run tests
+./.github/setup-unit.sh
+./gradlew test
 ```
+
+**Manual Setup:**
+```bash
+# Start DocumentDB mock server and MongoDB
+docker-compose -f docker-compose-ci.yml up -d
+
+# Run tests
+./gradlew check --parallel
+
+# Cleanup
+docker-compose -f docker-compose-ci.yml down
+```
+
+The mock server (`api-server.py`) provides:
+- **DocumentDB REST API simulation**: Endpoints matching real DocumentDB HTTP API
+- **MongoDB backend**: Uses MongoDB as the underlying database (DocumentDB-compatible)
+- **Test authentication**: Uses `testuser:testpass` credentials for testing
+- **Local endpoint**: Available at `http://localhost:10260`
+
+**Test Environment Details:**
+- **Mock API Server**: `http://localhost:10260` (simulates DocumentDB REST API)
+- **MongoDB Instance**: `localhost:27017` (backend storage)
+- **Test Credentials**: Username: `testuser`, Password: `testpass`
+- **Test Database**: `test_db`
 
 ### Local Development
 

@@ -22,11 +22,11 @@ class ReadTest {
     private RunContextFactory runContextFactory;
 
     @Test
-    void shouldValidateRequiredProperties() throws Exception {
+    void shouldCreateTaskWithRequiredProperties() {
         Read task = Read.builder()
             .id("test-read")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue("https://test-documentdb.com"))
+            .host(Property.ofValue("https://test-documentdb.com"))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
             .username(Property.ofValue("testuser"))
@@ -34,10 +34,8 @@ class ReadTest {
             .fetchType(Property.ofValue(FetchType.FETCH))
             .build();
 
-        RunContext runContext = runContextFactory.of();
-
-        // This should not throw an exception for validation
-        assertThat(task.getConnectionString(), is(notNullValue()));
+        assertThat(task, is(notNullValue()));
+        assertThat(task.getHost(), is(notNullValue()));
         assertThat(task.getDatabase(), is(notNullValue()));
         assertThat(task.getCollection(), is(notNullValue()));
         assertThat(task.getUsername(), is(notNullValue()));
@@ -50,7 +48,7 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-default")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue("https://test-documentdb.com"))
+            .host(Property.ofValue("https://test-documentdb.com"))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
             .username(Property.ofValue("testuser"))
@@ -65,7 +63,7 @@ class ReadTest {
     // All real integration tests pass, proving template and property handling works correctly
 
     @Test
-    void shouldHandleFilterProperty() throws Exception {
+    void shouldValidateTaskWithFilter() throws Exception {
         Map<String, Object> filter = Map.of(
             "status", "active",
             "age", Map.of("$gte", 18)
@@ -74,7 +72,7 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-filter")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue("https://test-documentdb.com"))
+            .host(Property.ofValue("https://test-documentdb.com"))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
             .username(Property.ofValue("testuser"))
@@ -83,14 +81,20 @@ class ReadTest {
             .fetchType(Property.ofValue(FetchType.FETCH))
             .build();
 
-        RunContext runContext = runContextFactory.of();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
-        // Should not throw validation errors
-        assertThat(task.getFilter(), is(notNullValue()));
+        // Task should fail with connection error (expected since using fake URL)
+        try {
+            task.run(runContext);
+            throw new AssertionError("Should have thrown exception due to invalid connection");
+        } catch (Exception e) {
+            // Expected - validates that task actually attempts to run and connect
+            assertThat(task.getFilter(), is(notNullValue()));
+        }
     }
 
     @Test
-    void shouldHandleAggregationPipeline() throws Exception {
+    void shouldValidateTaskWithAggregationPipeline() throws Exception {
         List<Map<String, Object>> pipeline = List.of(
             Map.of("$match", Map.of("status", "active")),
             Map.of("$group", Map.of(
@@ -102,7 +106,7 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-aggregation")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue("https://test-documentdb.com"))
+            .host(Property.ofValue("https://test-documentdb.com"))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
             .username(Property.ofValue("testuser"))
@@ -111,19 +115,25 @@ class ReadTest {
             .fetchType(Property.ofValue(FetchType.FETCH))
             .build();
 
-        RunContext runContext = runContextFactory.of();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
-        // Should not throw validation errors
-        assertThat(task.getAggregationPipeline(), is(notNullValue()));
+        // Task should fail with connection error (expected since using fake URL)
+        try {
+            task.run(runContext);
+            throw new AssertionError("Should have thrown exception due to invalid connection");
+        } catch (Exception e) {
+            // Expected - validates that task actually attempts to run and connect
+            assertThat(task.getAggregationPipeline(), is(notNullValue()));
+        }
     }
 
     @Test
-    void shouldHandleAllFetchTypes() throws Exception {
+    void shouldValidateAllFetchTypes() throws Exception {
         for (FetchType fetchType : FetchType.values()) {
             Read task = Read.builder()
                 .id("test-fetchtype-" + fetchType.name())
                 .type(Read.class.getName())
-                .connectionString(Property.ofValue("https://test-documentdb.com"))
+                .host(Property.ofValue("https://test-documentdb.com"))
                 .database(Property.ofValue("testdb"))
                 .collection(Property.ofValue("testcol"))
                 .username(Property.ofValue("testuser"))
@@ -131,8 +141,16 @@ class ReadTest {
                 .fetchType(Property.ofValue(fetchType))
                 .build();
 
-            // Should not throw validation errors for any fetch type
-            assertThat(task.getFetchType(), is(notNullValue()));
+            RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
+            // Task should fail with connection error (expected since using fake URL)
+            try {
+                task.run(runContext);
+                throw new AssertionError("Should have thrown exception due to invalid connection");
+            } catch (Exception e) {
+                // Expected - validates that task actually attempts to run and connect
+                assertThat(task.getFetchType(), is(notNullValue()));
+            }
         }
     }
 }

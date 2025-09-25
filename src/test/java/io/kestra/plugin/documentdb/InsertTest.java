@@ -25,7 +25,7 @@ class InsertTest {
         Insert task = Insert.builder()
             .id("test-insert")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue("https://test-documentdb.com"))
+            .host(Property.ofValue("https://test-documentdb.com"))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
             .username(Property.ofValue("testuser"))
@@ -36,7 +36,7 @@ class InsertTest {
         RunContext runContext = runContextFactory.of();
 
         // This should not throw an exception for validation
-        assertThat(task.getConnectionString(), is(notNullValue()));
+        assertThat(task.getHost(), is(notNullValue()));
         assertThat(task.getDatabase(), is(notNullValue()));
         assertThat(task.getCollection(), is(notNullValue()));
         assertThat(task.getUsername(), is(notNullValue()));
@@ -48,7 +48,7 @@ class InsertTest {
         Insert task = Insert.builder()
             .id("test-reject-both")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue("https://test-documentdb.com"))
+            .host(Property.ofValue("https://test-documentdb.com"))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
             .username(Property.ofValue("testuser"))
@@ -57,7 +57,7 @@ class InsertTest {
             .documents(Property.ofValue(List.of(Map.of("name", "Test Document 2"))))
             .build();
 
-        RunContext runContext = runContextFactory.of();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
         try {
             task.run(runContext);
@@ -72,14 +72,14 @@ class InsertTest {
         Insert task = Insert.builder()
             .id("test-reject-neither")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue("https://test-documentdb.com"))
+            .host(Property.ofValue("https://test-documentdb.com"))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
             .username(Property.ofValue("testuser"))
             .password(Property.ofValue("testpass"))
             .build();
 
-        RunContext runContext = runContextFactory.of();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
         try {
             task.run(runContext);
@@ -101,7 +101,7 @@ class InsertTest {
         Insert task = Insert.builder()
             .id("test-too-many")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue("https://test-documentdb.com"))
+            .host(Property.ofValue("https://test-documentdb.com"))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
             .username(Property.ofValue("testuser"))
@@ -109,7 +109,7 @@ class InsertTest {
             .documents(Property.ofValue(tooManyDocs))
             .build();
 
-        RunContext runContext = runContextFactory.of();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
         try {
             task.run(runContext);

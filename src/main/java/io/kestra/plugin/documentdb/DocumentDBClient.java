@@ -33,12 +33,12 @@ public class DocumentDBClient {
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private final String connectionString;
+    private final String host;
     private final String username;
     private final String password;
 
-    public DocumentDBClient(String connectionString, String username, String password, RunContext runContext) throws Exception {
-        this.connectionString = connectionString;
+    public DocumentDBClient(String host, String username, String password, RunContext runContext) throws Exception {
+        this.host = host;
         this.username = username;
         this.password = password;
         this.objectMapper = new ObjectMapper();
@@ -205,8 +205,8 @@ public class DocumentDBClient {
      */
     private String buildUrl(String action) {
         // Remove trailing slash if present
-        String baseUrl = connectionString.endsWith("/") ?
-            connectionString.substring(0, connectionString.length() - 1) : connectionString;
+        String baseUrl = host.endsWith("/") ?
+            host.substring(0, host.length() - 1) : host;
         return baseUrl + "/data/v1/action/" + action;
     }
 

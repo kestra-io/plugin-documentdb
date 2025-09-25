@@ -45,7 +45,7 @@ import java.util.Map;
                 tasks:
                   - id: find_users
                     type: io.kestra.plugin.documentdb.Read
-                    connectionString: "https://my-documentdb-instance.com"
+                    host: "https://my-documentdb-instance.com"
                     database: "myapp"
                     collection: "users"
                     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -63,7 +63,7 @@ import java.util.Map;
                 tasks:
                   - id: find_filtered_users
                     type: io.kestra.plugin.documentdb.Read
-                    connectionString: "https://my-documentdb-instance.com"
+                    host: "https://my-documentdb-instance.com"
                     database: "myapp"
                     collection: "users"
                     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -86,7 +86,7 @@ import java.util.Map;
                 tasks:
                   - id: find_one_user
                     type: io.kestra.plugin.documentdb.Read
-                    connectionString: "https://my-documentdb-instance.com"
+                    host: "https://my-documentdb-instance.com"
                     database: "myapp"
                     collection: "users"
                     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -106,7 +106,7 @@ import java.util.Map;
                 tasks:
                   - id: aggregate_users
                     type: io.kestra.plugin.documentdb.Read
-                    connectionString: "https://my-documentdb-instance.com"
+                    host: "https://my-documentdb-instance.com"
                     database: "myapp"
                     collection: "users"
                     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -128,11 +128,11 @@ import java.util.Map;
 public class Read extends Task implements RunnableTask<Read.Output> {
 
     @Schema(
-        title = "DocumentDB connection string",
+        title = "DocumentDB host",
         description = "The HTTP endpoint URL of your DocumentDB instance"
     )
     @NotNull
-    private Property<String> connectionString;
+    private Property<String> host;
 
     @Schema(
         title = "Database name",
@@ -199,7 +199,7 @@ public class Read extends Task implements RunnableTask<Read.Output> {
         Logger logger = runContext.logger();
 
         // Render properties
-        String rConnectionString = runContext.render(this.connectionString).as(String.class).orElseThrow();
+        String rHost = runContext.render(this.host).as(String.class).orElseThrow();
         String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
         String rCollection = runContext.render(this.collection).as(String.class).orElseThrow();
         String rUsername = runContext.render(this.username).as(String.class).orElseThrow();
@@ -210,7 +210,7 @@ public class Read extends Task implements RunnableTask<Read.Output> {
         Integer rSkip = runContext.render(this.skip).as(Integer.class).orElse(null);
         FetchType rFetchType = runContext.render(this.fetchType).as(FetchType.class).orElse(FetchType.FETCH);
 
-        DocumentDBClient client = new DocumentDBClient(rConnectionString, rUsername, rPassword, runContext);
+        DocumentDBClient client = new DocumentDBClient(rHost, rUsername, rPassword, runContext);
 
         List<DocumentDBRecord> records;
 
@@ -233,7 +233,7 @@ public class Read extends Task implements RunnableTask<Read.Output> {
 
         switch (rFetchType) {
             case FETCH_ONE:
-                result = records.isEmpty() ? null : convertRecordToMap(records.get(0));
+                result = records.isEmpty() ? null : convertRecordToMap(records.getFirst());
                 recordCount = records.isEmpty() ? 0 : 1;
                 break;
             case NONE:

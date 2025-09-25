@@ -37,7 +37,7 @@ class DocumentDBIntegrationTest {
     RunContextFactory runContextFactory;
 
     // Real connection details for local DocumentDB container
-    private static final String CONNECTION_STRING = "http://localhost:10260";
+    private static final String HOST = "http://localhost:10260";
     private static final String DATABASE = "test_db";
     private static final String COLLECTION = "integration_test";
     private static final String USERNAME = "testuser";
@@ -51,7 +51,7 @@ class DocumentDBIntegrationTest {
         Insert insertTask = Insert.builder()
             .id("insert-real-test")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+.host(Property.ofValue(HOST))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
@@ -70,14 +70,14 @@ class DocumentDBIntegrationTest {
 
         assertThat("Document should be inserted", insertOutput.getInsertedCount(), equalTo(1));
         assertThat("Should return inserted ID", insertOutput.getInsertedIds(), hasSize(1));
-        String insertedId = insertOutput.getInsertedIds().get(0);
+        String insertedId = insertOutput.getInsertedIds().getFirst();
         System.out.println("✅ Inserted document with ID: " + insertedId);
 
         // Read the document back using real credentials
         Read readTask = Read.builder()
             .id("read-real-test")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+.host(Property.ofValue(HOST))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
@@ -103,7 +103,7 @@ class DocumentDBIntegrationTest {
         Insert insertTask = Insert.builder()
             .id("insert-multiple-real-test")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+.host(Property.ofValue(HOST))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
@@ -130,7 +130,7 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("fetch-one-real-test")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+.host(Property.ofValue(HOST))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
@@ -155,7 +155,7 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("limit-skip-real-test")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+.host(Property.ofValue(HOST))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
@@ -182,7 +182,7 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("aggregation-real-test")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+.host(Property.ofValue(HOST))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
@@ -206,7 +206,7 @@ class DocumentDBIntegrationTest {
         assertThat("Should return aggregation results", readOutput.getRows().size(), greaterThan(0));
 
         // Verify aggregation structure
-        Map<String, Object> firstResult = readOutput.getRows().get(0);
+        Map<String, Object> firstResult = readOutput.getRows().getFirst();
         assertThat("Should have _id field", firstResult.containsKey("_id"), equalTo(true));
         assertThat("Should have count field", firstResult.containsKey("count"), equalTo(true));
 

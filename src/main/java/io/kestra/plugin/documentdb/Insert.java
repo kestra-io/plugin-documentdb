@@ -45,7 +45,7 @@ import java.util.Map;
                 tasks:
                   - id: insert_user
                     type: io.kestra.plugin.documentdb.Insert
-                    connectionString: "https://my-documentdb-instance.com"
+                    host: "https://my-documentdb-instance.com"
                     database: "myapp"
                     collection: "users"
                     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -67,7 +67,7 @@ import java.util.Map;
                 tasks:
                   - id: insert_product_batch
                     type: io.kestra.plugin.documentdb.Insert
-                    connectionString: "https://my-documentdb-instance.com"
+                    host: "https://my-documentdb-instance.com"
                     database: "inventory"
                     collection: "products"
                     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -104,7 +104,7 @@ import java.util.Map;
                 tasks:
                   - id: insert_order
                     type: io.kestra.plugin.documentdb.Insert
-                    connectionString: "https://my-documentdb-instance.com"
+                    host: "https://my-documentdb-instance.com"
                     database: "sales"
                     collection: "orders"
                     username: "{{ secret('DOCUMENTDB_USERNAME') }}"
@@ -122,11 +122,11 @@ import java.util.Map;
 public class Insert extends Task implements RunnableTask<Insert.Output> {
 
     @Schema(
-        title = "DocumentDB connection string",
+        title = "DocumentDB host",
         description = "The HTTP endpoint URL of your DocumentDB instance"
     )
     @NotNull
-    private Property<String> connectionString;
+    private Property<String> host;
 
     @Schema(
         title = "Database name",
@@ -173,7 +173,7 @@ public class Insert extends Task implements RunnableTask<Insert.Output> {
         Logger logger = runContext.logger();
 
         // Render properties
-        String rConnectionString = runContext.render(this.connectionString).as(String.class).orElseThrow();
+        String rHost = runContext.render(this.host).as(String.class).orElseThrow();
         String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
         String rCollection = runContext.render(this.collection).as(String.class).orElseThrow();
         String rUsername = runContext.render(this.username).as(String.class).orElseThrow();
@@ -190,7 +190,7 @@ public class Insert extends Task implements RunnableTask<Insert.Output> {
             throw new IllegalArgumentException("Cannot specify both 'document' and 'documents'. Use one or the other.");
         }
 
-        DocumentDBClient client = new DocumentDBClient(rConnectionString, rUsername, rPassword, runContext);
+        DocumentDBClient client = new DocumentDBClient(rHost, rUsername, rPassword, runContext);
 
         if (rDocument != null && !rDocument.isEmpty()) {
             // Insert single document
@@ -198,10 +198,10 @@ public class Insert extends Task implements RunnableTask<Insert.Output> {
 
             InsertResult result = client.insertOne(rDatabase, rCollection, rDocument);
 
-            logger.info("Successfully inserted document with ID: {}", result.getInsertedIds().get(0));
+            logger.info("Successfully inserted document with ID: {}", result.getInsertedIds().getFirst());
 
             return Output.builder()
-                .insertedId(result.getInsertedIds().get(0))
+                .insertedId(result.getInsertedIds().getFirst())
                 .insertedIds(result.getInsertedIds())
                 .insertedCount(result.getInsertedCount())
                 .build();
@@ -218,7 +218,7 @@ public class Insert extends Task implements RunnableTask<Insert.Output> {
             logger.info("Successfully inserted {} documents", result.getInsertedCount());
 
             return Output.builder()
-                .insertedId(result.getInsertedIds().isEmpty() ? null : result.getInsertedIds().get(0))
+                .insertedId(result.getInsertedIds().isEmpty() ? null : result.getInsertedIds().getFirst())
                 .insertedIds(result.getInsertedIds())
                 .insertedCount(result.getInsertedCount())
                 .build();
