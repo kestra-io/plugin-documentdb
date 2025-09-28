@@ -19,6 +19,10 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.slf4j.Logger;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
@@ -227,49 +231,29 @@ public class Read extends Task implements RunnableTask<Read.Output> {
 
         logger.info("Found {} documents", records.size());
 
-        // Handle fetchType logic
-        Object result;
+        // Handle fetchType logic and build output in single switch
         int recordCount = records.size();
+        Output.OutputBuilder outputBuilder = Output.builder();
 
         switch (rFetchType) {
             case FETCH_ONE:
-                result = records.isEmpty() ? null : convertRecordToMap(records.getFirst());
+                Map<String, Object> row = records.isEmpty() ? null : convertRecordToMap(records.getFirst());
                 recordCount = records.isEmpty() ? 0 : 1;
+                outputBuilder.size((long) recordCount).row(row);
                 break;
             case NONE:
-                result = null;
+                outputBuilder.size((long) recordCount);
                 break;
             case STORE:
-                result = storeRecordsAsFile(runContext, records);
+                StoredResult storedResult = storeRecordsAsFile(runContext, records);
+                outputBuilder.size((long) recordCount).uri(storedResult.getUri());
                 break;
             case FETCH:
             default:
-                result = records.stream()
+                List<Map<String, Object>> rows = records.stream()
                     .map(this::convertRecordToMap)
                     .toList();
-                break;
-        }
-
-        // Build output based on fetch type
-        Output.OutputBuilder outputBuilder = Output.builder().size((long) recordCount);
-
-        switch (rFetchType) {
-            case FETCH_ONE:
-                @SuppressWarnings("unchecked")
-                Map<String, Object> row = result instanceof Map ? (Map<String, Object>) result : null;
-                outputBuilder.row(row);
-                break;
-            case FETCH:
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> rows = result instanceof List ? (List<Map<String, Object>>) result : null;
-                outputBuilder.rows(rows);
-                break;
-            case STORE:
-                outputBuilder.uri(result instanceof StoredResult ? ((StoredResult) result).getUri() : null);
-                break;
-            case NONE:
-            default:
-                // No output data for NONE
+                outputBuilder.size((long) recordCount).rows(rows);
                 break;
         }
 
@@ -290,12 +274,97 @@ public class Read extends Task implements RunnableTask<Read.Output> {
     /**
      * Store records as an ION file in Kestra's internal storage.
      * Returns a StoredResult containing both the URI and record count.
-     * TODO: Implement proper file storage once storage interface is clarified
      */
-    private StoredResult storeRecordsAsFile(RunContext runContext, List<DocumentDBRecord> records) {
-        // Temporary implementation - return null URI but correct count
-        // This needs to be implemented with proper storage interface
-        return new StoredResult(null, records.size());
+    private StoredResult storeRecordsAsFile(RunContext runContext, List<DocumentDBRecord> records) throws IOException {
+        try {
+            // Create a temporary file for Ion format
+            File tempFile = File.createTempFile("documentdb_records_", ".ion");
+
+            // Write records to the temporary file in Ion format
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile))) {
+                for (DocumentDBRecord record : records) {
+                    // Convert record to Map format for Ion serialization
+                    Map<String, Object> recordMap = convertRecordToMap(record);
+
+                    // Write as Ion format - Amazon Ion text format
+                    // Ion text format is similar to JSON but with some differences
+                    writer.write(mapToIonText(recordMap));
+                    writer.newLine();
+                }
+            }
+
+            // Store the temporary file in Kestra's internal storage
+            URI storedFileUri = runContext.storage().putFile(tempFile);
+
+            return new StoredResult(storedFileUri, records.size());
+
+        } catch (IOException e) {
+            throw new IOException("Failed to store records as Ion file: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Convert a Map to Ion text format.
+     * Ion text format is similar to JSON but with Amazon Ion syntax.
+     */
+    private String mapToIonText(Map<String, Object> map) {
+        StringBuilder ion = new StringBuilder();
+        ion.append("{");
+
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            if (!first) {
+                ion.append(",");
+            }
+            first = false;
+
+            // Ion format: key:value
+            ion.append(ionEscape(entry.getKey())).append(":");
+            ion.append(valueToIonText(entry.getValue()));
+        }
+
+        ion.append("}");
+        return ion.toString();
+    }
+
+    /**
+     * Convert a value to Ion text format.
+     */
+    private String valueToIonText(Object value) {
+        if (value == null) {
+            return "null";
+        } else if (value instanceof String) {
+            return "\"" + ionEscape((String) value) + "\"";
+        } else if (value instanceof Number || value instanceof Boolean) {
+            return value.toString();
+        } else if (value instanceof List) {
+            List<?> list = (List<?>) value;
+            StringBuilder ion = new StringBuilder();
+            ion.append("[");
+            for (int i = 0; i < list.size(); i++) {
+                if (i > 0) ion.append(",");
+                ion.append(valueToIonText(list.get(i)));
+            }
+            ion.append("]");
+            return ion.toString();
+        } else if (value instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) value;
+            return mapToIonText(map);
+        } else {
+            return "\"" + ionEscape(value.toString()) + "\"";
+        }
+    }
+
+    /**
+     * Escape special characters for Ion text format.
+     */
+    private String ionEscape(String str) {
+        return str.replace("\\", "\\\\")
+                  .replace("\"", "\\\"")
+                  .replace("\n", "\\n")
+                  .replace("\r", "\\r")
+                  .replace("\t", "\\t");
     }
 
     /**

@@ -22,7 +22,7 @@ class ReadTest {
     private RunContextFactory runContextFactory;
 
     @Test
-    void shouldCreateTaskWithRequiredProperties() {
+    void shouldCreateTaskWithRequiredProperties() throws Exception {
         Read task = Read.builder()
             .id("test-read")
             .type(Read.class.getName())
@@ -34,6 +34,8 @@ class ReadTest {
             .fetchType(Property.ofValue(FetchType.FETCH))
             .build();
 
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
         assertThat(task, is(notNullValue()));
         assertThat(task.getHost(), is(notNullValue()));
         assertThat(task.getDatabase(), is(notNullValue()));
@@ -41,6 +43,22 @@ class ReadTest {
         assertThat(task.getUsername(), is(notNullValue()));
         assertThat(task.getPassword(), is(notNullValue()));
         assertThat(task.getFetchType(), is(notNullValue()));
+
+        // Task should fail with connection error since no mock server is running
+        // but this validates that the task configuration is valid
+        try {
+            task.run(runContext);
+            throw new AssertionError("Should have thrown exception due to connection failure");
+        } catch (Exception e) {
+            // Expected - connection will fail since no mock server is running
+            // This validates the task can be executed with valid properties
+            assertThat(e.getMessage(), anyOf(
+                containsString("Connection refused"),
+                containsString("Failed to find documents"),
+                containsString("Name or service not known"),
+                containsString("UnknownHostException")
+            ));
+        }
     }
 
     @Test
@@ -55,8 +73,26 @@ class ReadTest {
             .password(Property.ofValue("testpass"))
             .build();
 
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
         // Should default to FETCH
         assertThat(task.getFetchType(), is(notNullValue()));
+
+        // Task should fail with connection error since no mock server is running
+        // but this validates that the task configuration is valid with default fetchType
+        try {
+            task.run(runContext);
+            throw new AssertionError("Should have thrown exception due to connection failure");
+        } catch (Exception e) {
+            // Expected - connection will fail since no mock server is running
+            // This validates the task can be executed with default fetchType
+            assertThat(e.getMessage(), anyOf(
+                containsString("Connection refused"),
+                containsString("Failed to find documents"),
+                containsString("Name or service not known"),
+                containsString("UnknownHostException")
+            ));
+        }
     }
 
     // Template rendering is fully tested and working in DocumentDBIntegrationTest

@@ -33,7 +33,7 @@ class InsertTest {
             .document(Property.ofValue(Map.of("name", "Test Document")))
             .build();
 
-        RunContext runContext = runContextFactory.of();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
         // This should not throw an exception for validation
         assertThat(task.getHost(), is(notNullValue()));
@@ -41,6 +41,22 @@ class InsertTest {
         assertThat(task.getCollection(), is(notNullValue()));
         assertThat(task.getUsername(), is(notNullValue()));
         assertThat(task.getPassword(), is(notNullValue()));
+
+        // Task should fail with connection error since no mock server is running
+        // but this validates that the task configuration is valid
+        try {
+            task.run(runContext);
+            throw new AssertionError("Should have thrown exception due to connection failure");
+        } catch (Exception e) {
+            // Expected - connection will fail since no mock server is running
+            // This validates the task can be executed with valid properties
+            assertThat(e.getMessage(), anyOf(
+                containsString("Connection refused"),
+                containsString("Failed to insert document"),
+                containsString("Name or service not known"),
+                containsString("UnknownHostException")
+            ));
+        }
     }
 
     @Test
