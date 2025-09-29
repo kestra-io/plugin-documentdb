@@ -153,6 +153,103 @@ def aggregate():
         logger.error(f"Aggregate error: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/data/v1/action/updateOne', methods=['POST'])
+def update_one():
+    """Update a single document"""
+    if not authenticate_request():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        data = request.get_json()
+        database = data['database']
+        collection_name = data['collection']
+        filter_criteria = data.get('filter', {})
+        update_doc = data['update']
+
+        collection = get_collection(database, collection_name)
+        result = collection.update_one(filter_criteria, update_doc)
+
+        return jsonify({
+            'matchedCount': result.matched_count,
+            'modifiedCount': result.modified_count,
+            'upsertedId': str(result.upserted_id) if result.upserted_id else None
+        })
+
+    except Exception as e:
+        logger.error(f"Update one error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/data/v1/action/updateMany', methods=['POST'])
+def update_many():
+    """Update multiple documents"""
+    if not authenticate_request():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        data = request.get_json()
+        database = data['database']
+        collection_name = data['collection']
+        filter_criteria = data.get('filter', {})
+        update_doc = data['update']
+
+        collection = get_collection(database, collection_name)
+        result = collection.update_many(filter_criteria, update_doc)
+
+        return jsonify({
+            'matchedCount': result.matched_count,
+            'modifiedCount': result.modified_count
+        })
+
+    except Exception as e:
+        logger.error(f"Update many error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/data/v1/action/deleteOne', methods=['POST'])
+def delete_one():
+    """Delete a single document"""
+    if not authenticate_request():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        data = request.get_json()
+        database = data['database']
+        collection_name = data['collection']
+        filter_criteria = data.get('filter', {})
+
+        collection = get_collection(database, collection_name)
+        result = collection.delete_one(filter_criteria)
+
+        return jsonify({
+            'deletedCount': result.deleted_count
+        })
+
+    except Exception as e:
+        logger.error(f"Delete one error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/data/v1/action/deleteMany', methods=['POST'])
+def delete_many():
+    """Delete multiple documents"""
+    if not authenticate_request():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        data = request.get_json()
+        database = data['database']
+        collection_name = data['collection']
+        filter_criteria = data.get('filter', {})
+
+        collection = get_collection(database, collection_name)
+        result = collection.delete_many(filter_criteria)
+
+        return jsonify({
+            'deletedCount': result.deleted_count
+        })
+
+    except Exception as e:
+        logger.error(f"Delete many error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""

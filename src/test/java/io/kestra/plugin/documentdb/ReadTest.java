@@ -44,13 +44,13 @@ class ReadTest {
         assertThat(task.getPassword(), is(notNullValue()));
         assertThat(task.getFetchType(), is(notNullValue()));
 
-        // Task should fail with connection error since no mock server is running
+        // Task should fail with connection error since this unit test uses a non-existent host
         // but this validates that the task configuration is valid
         try {
             task.run(runContext);
             throw new AssertionError("Should have thrown exception due to connection failure");
         } catch (Exception e) {
-            // Expected - connection will fail since no mock server is running
+            // Expected - connection will fail to the non-existent test host
             // This validates the task can be executed with valid properties
             assertThat(e.getMessage(), anyOf(
                 containsString("Connection refused"),
@@ -78,13 +78,13 @@ class ReadTest {
         // Should default to FETCH
         assertThat(task.getFetchType(), is(notNullValue()));
 
-        // Task should fail with connection error since no mock server is running
+        // Task should fail with connection error since this unit test uses a non-existent host
         // but this validates that the task configuration is valid with default fetchType
         try {
             task.run(runContext);
             throw new AssertionError("Should have thrown exception due to connection failure");
         } catch (Exception e) {
-            // Expected - connection will fail since no mock server is running
+            // Expected - connection will fail to the non-existent test host
             // This validates the task can be executed with default fetchType
             assertThat(e.getMessage(), anyOf(
                 containsString("Connection refused"),
@@ -95,8 +95,6 @@ class ReadTest {
         }
     }
 
-    // Template rendering is fully tested and working in DocumentDBIntegrationTest
-    // All real integration tests pass, proving template and property handling works correctly
 
     @Test
     void shouldValidateTaskWithFilter() throws Exception {

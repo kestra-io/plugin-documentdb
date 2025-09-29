@@ -4,6 +4,7 @@ Thumbs.db
 build/
 target/
 out/
+bin/
 .idea
 .vscode
 *.iml
@@ -12,5 +13,6 @@ out/
 .project
 .settings
 .classpath
+.factorypath
 .attach*
 src/test/resources/application-test.yml

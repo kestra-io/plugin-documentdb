@@ -11,6 +11,8 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.documentdb.models.DocumentDBException;
 import io.kestra.plugin.documentdb.models.DocumentDBRecord;
 import io.kestra.plugin.documentdb.models.InsertResult;
+import io.kestra.plugin.documentdb.models.UpdateResult;
+import io.kestra.plugin.documentdb.models.DeleteResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -264,5 +266,179 @@ public class DocumentDBClient {
         }
 
         return records;
+    }
+
+    /**
+     * Update a single document in a collection.
+     */
+    public UpdateResult updateOne(String database, String collection, Map<String, Object> filter, Map<String, Object> update) throws Exception {
+        String url = buildUrl("updateOne");
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("database", database);
+        requestBody.put("collection", collection);
+        if (filter != null && !filter.isEmpty()) {
+            requestBody.put("filter", filter);
+        }
+        requestBody.put("update", update);
+
+        HttpRequest request = HttpRequest.builder()
+            .method("POST")
+            .uri(URI.create(url))
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Accept", "application/json")
+            .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
+            .body(HttpRequest.JsonRequestBody.builder()
+                .content(requestBody)
+                .build())
+            .build();
+
+        logger.debug("Making POST request to: {}", url);
+
+        try {
+            HttpResponse<String> response = httpClient.request(request, String.class);
+            return parseUpdateResponse(response.getBody());
+        } catch (HttpClientResponseException e) {
+            String statusCode = e.getResponse() != null ? String.valueOf(e.getResponse().getStatus().getCode()) : "unknown";
+            String responseBody = e.getResponse() != null ? String.valueOf(e.getResponse().getBody()) : "unknown";
+            throw new DocumentDBException("Failed to update document: " + statusCode + " - " + responseBody);
+        }
+    }
+
+    /**
+     * Update multiple documents in a collection.
+     */
+    public UpdateResult updateMany(String database, String collection, Map<String, Object> filter, Map<String, Object> update) throws Exception {
+        String url = buildUrl("updateMany");
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("database", database);
+        requestBody.put("collection", collection);
+        if (filter != null && !filter.isEmpty()) {
+            requestBody.put("filter", filter);
+        }
+        requestBody.put("update", update);
+
+        HttpRequest request = HttpRequest.builder()
+            .method("POST")
+            .uri(URI.create(url))
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Accept", "application/json")
+            .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
+            .body(HttpRequest.JsonRequestBody.builder()
+                .content(requestBody)
+                .build())
+            .build();
+
+        logger.debug("Making POST request to: {}", url);
+
+        try {
+            HttpResponse<String> response = httpClient.request(request, String.class);
+            return parseUpdateResponse(response.getBody());
+        } catch (HttpClientResponseException e) {
+            String statusCode = e.getResponse() != null ? String.valueOf(e.getResponse().getStatus().getCode()) : "unknown";
+            String responseBody = e.getResponse() != null ? String.valueOf(e.getResponse().getBody()) : "unknown";
+            throw new DocumentDBException("Failed to update documents: " + statusCode + " - " + responseBody);
+        }
+    }
+
+    /**
+     * Delete a single document from a collection.
+     */
+    public DeleteResult deleteOne(String database, String collection, Map<String, Object> filter) throws Exception {
+        String url = buildUrl("deleteOne");
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("database", database);
+        requestBody.put("collection", collection);
+        if (filter != null && !filter.isEmpty()) {
+            requestBody.put("filter", filter);
+        }
+
+        HttpRequest request = HttpRequest.builder()
+            .method("POST")
+            .uri(URI.create(url))
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Accept", "application/json")
+            .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
+            .body(HttpRequest.JsonRequestBody.builder()
+                .content(requestBody)
+                .build())
+            .build();
+
+        logger.debug("Making POST request to: {}", url);
+
+        try {
+            HttpResponse<String> response = httpClient.request(request, String.class);
+            return parseDeleteResponse(response.getBody());
+        } catch (HttpClientResponseException e) {
+            String statusCode = e.getResponse() != null ? String.valueOf(e.getResponse().getStatus().getCode()) : "unknown";
+            String responseBody = e.getResponse() != null ? String.valueOf(e.getResponse().getBody()) : "unknown";
+            throw new DocumentDBException("Failed to delete document: " + statusCode + " - " + responseBody);
+        }
+    }
+
+    /**
+     * Delete multiple documents from a collection.
+     */
+    public DeleteResult deleteMany(String database, String collection, Map<String, Object> filter) throws Exception {
+        String url = buildUrl("deleteMany");
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("database", database);
+        requestBody.put("collection", collection);
+        if (filter != null && !filter.isEmpty()) {
+            requestBody.put("filter", filter);
+        }
+
+        HttpRequest request = HttpRequest.builder()
+            .method("POST")
+            .uri(URI.create(url))
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Accept", "application/json")
+            .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
+            .body(HttpRequest.JsonRequestBody.builder()
+                .content(requestBody)
+                .build())
+            .build();
+
+        logger.debug("Making POST request to: {}", url);
+
+        try {
+            HttpResponse<String> response = httpClient.request(request, String.class);
+            return parseDeleteResponse(response.getBody());
+        } catch (HttpClientResponseException e) {
+            String statusCode = e.getResponse() != null ? String.valueOf(e.getResponse().getStatus().getCode()) : "unknown";
+            String responseBody = e.getResponse() != null ? String.valueOf(e.getResponse().getBody()) : "unknown";
+            throw new DocumentDBException("Failed to delete documents: " + statusCode + " - " + responseBody);
+        }
+    }
+
+    /**
+     * Parse update response from DocumentDB API.
+     */
+    private UpdateResult parseUpdateResponse(String responseBody) throws JsonProcessingException {
+        JsonNode jsonNode = objectMapper.readTree(responseBody);
+
+        Integer matchedCount = jsonNode.has("matchedCount") ? jsonNode.get("matchedCount").asInt() : 0;
+        Integer modifiedCount = jsonNode.has("modifiedCount") ? jsonNode.get("modifiedCount").asInt() : 0;
+        String upsertedId = null;
+
+        if (jsonNode.has("upsertedId") && !jsonNode.get("upsertedId").isNull()) {
+            upsertedId = jsonNode.get("upsertedId").asText();
+        }
+
+        return new UpdateResult(matchedCount, modifiedCount, upsertedId);
+    }
+
+    /**
+     * Parse delete response from DocumentDB API.
+     */
+    private DeleteResult parseDeleteResponse(String responseBody) throws JsonProcessingException {
+        JsonNode jsonNode = objectMapper.readTree(responseBody);
+
+        Integer deletedCount = jsonNode.has("deletedCount") ? jsonNode.get("deletedCount").asInt() : 0;
+
+        return new DeleteResult(deletedCount);
     }
 }
