@@ -25,7 +25,7 @@ services:
       mongodb:
         condition: service_healthy
     ports:
-      - "127.0.0.1:10260:10260"
+      - "0.0.0.0:10260:10260"
     volumes:
       - ./api-server.py:/app/api-server.py:ro
     working_dir: /app
