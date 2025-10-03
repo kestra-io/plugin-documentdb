@@ -18,6 +18,8 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.slf4j.Logger;
+import reactor.core.publisher.Flux;
+import io.kestra.core.serializers.FileSerde;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -129,42 +131,7 @@ import java.util.Map;
         )
     }
 )
-public class Read extends Task implements RunnableTask<Read.Output> {
-
-    @Schema(
-        title = "DocumentDB host",
-        description = "The HTTP endpoint URL of your DocumentDB instance"
-    )
-    @NotNull
-    private Property<String> host;
-
-    @Schema(
-        title = "Database name",
-        description = "The name of the database to read from"
-    )
-    @NotNull
-    private Property<String> database;
-
-    @Schema(
-        title = "Collection name",
-        description = "The name of the collection to read from"
-    )
-    @NotNull
-    private Property<String> collection;
-
-    @Schema(
-        title = "Username",
-        description = "DocumentDB username for authentication"
-    )
-    @NotNull
-    private Property<String> username;
-
-    @Schema(
-        title = "Password",
-        description = "DocumentDB password for authentication"
-    )
-    @NotNull
-    private Property<String> password;
+public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Output> {
 
     @Schema(
         title = "Filter",
@@ -278,93 +245,24 @@ public class Read extends Task implements RunnableTask<Read.Output> {
     private StoredResult storeRecordsAsFile(RunContext runContext, List<DocumentDBRecord> records) throws IOException {
         try {
             // Create a temporary file for Ion format
-            File tempFile = File.createTempFile("documentdb_records_", ".ion");
+            File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
-            // Write records to the temporary file in Ion format
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile))) {
-                for (DocumentDBRecord record : records) {
-                    // Convert record to Map format for Ion serialization
-                    Map<String, Object> recordMap = convertRecordToMap(record);
+            // Stream records via Flux and write to file using FileSerde
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)) {
+                Flux<Map<String, Object>> recordFlux = Flux.fromIterable(records)
+                    .map(this::convertRecordToMap);
 
-                    // Write as Ion format - Amazon Ion text format
-                    // Ion text format is similar to JSON but with some differences
-                    writer.write(mapToIonText(recordMap));
-                    writer.newLine();
-                }
+                Long count = FileSerde.writeAll(writer, recordFlux).block();
+
+                // Store the temporary file in Kestra's internal storage
+                URI storedFileUri = runContext.storage().putFile(tempFile);
+
+                return new StoredResult(storedFileUri, count != null ? count.intValue() : 0);
             }
-
-            // Store the temporary file in Kestra's internal storage
-            URI storedFileUri = runContext.storage().putFile(tempFile);
-
-            return new StoredResult(storedFileUri, records.size());
 
         } catch (IOException e) {
             throw new IOException("Failed to store records as Ion file: " + e.getMessage(), e);
         }
-    }
-
-    /**
-     * Convert a Map to Ion text format.
-     * Ion text format is similar to JSON but with Amazon Ion syntax.
-     */
-    private String mapToIonText(Map<String, Object> map) {
-        StringBuilder ion = new StringBuilder();
-        ion.append("{");
-
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (!first) {
-                ion.append(",");
-            }
-            first = false;
-
-            // Ion format: key:value
-            ion.append(ionEscape(entry.getKey())).append(":");
-            ion.append(valueToIonText(entry.getValue()));
-        }
-
-        ion.append("}");
-        return ion.toString();
-    }
-
-    /**
-     * Convert a value to Ion text format.
-     */
-    private String valueToIonText(Object value) {
-        if (value == null) {
-            return "null";
-        } else if (value instanceof String) {
-            return "\"" + ionEscape((String) value) + "\"";
-        } else if (value instanceof Number || value instanceof Boolean) {
-            return value.toString();
-        } else if (value instanceof List) {
-            List<?> list = (List<?>) value;
-            StringBuilder ion = new StringBuilder();
-            ion.append("[");
-            for (int i = 0; i < list.size(); i++) {
-                if (i > 0) ion.append(",");
-                ion.append(valueToIonText(list.get(i)));
-            }
-            ion.append("]");
-            return ion.toString();
-        } else if (value instanceof Map) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> map = (Map<String, Object>) value;
-            return mapToIonText(map);
-        } else {
-            return "\"" + ionEscape(value.toString()) + "\"";
-        }
-    }
-
-    /**
-     * Escape special characters for Ion text format.
-     */
-    private String ionEscape(String str) {
-        return str.replace("\\", "\\\\")
-                  .replace("\"", "\\\"")
-                  .replace("\n", "\\n")
-                  .replace("\r", "\\r")
-                  .replace("\t", "\\t");
     }
 
     /**

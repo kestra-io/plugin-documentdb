@@ -119,42 +119,7 @@ import java.util.Map;
         )
     }
 )
-public class Insert extends Task implements RunnableTask<Insert.Output> {
-
-    @Schema(
-        title = "DocumentDB host",
-        description = "The HTTP endpoint URL of your DocumentDB instance"
-    )
-    @NotNull
-    private Property<String> host;
-
-    @Schema(
-        title = "Database name",
-        description = "The name of the database to insert into"
-    )
-    @NotNull
-    private Property<String> database;
-
-    @Schema(
-        title = "Collection name",
-        description = "The name of the collection to insert into"
-    )
-    @NotNull
-    private Property<String> collection;
-
-    @Schema(
-        title = "Username",
-        description = "DocumentDB username for authentication"
-    )
-    @NotNull
-    private Property<String> username;
-
-    @Schema(
-        title = "Password",
-        description = "DocumentDB password for authentication"
-    )
-    @NotNull
-    private Property<String> password;
+public class Insert extends AbstractDocumentDBTask implements RunnableTask<Insert.Output> {
 
     @Schema(
         title = "Document for single insert",

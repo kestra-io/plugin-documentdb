@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.http.HttpRequest;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.http.HttpResponse;
 import io.kestra.core.http.client.HttpClient;
 import io.kestra.core.http.client.HttpClientResponseException;
@@ -43,7 +44,7 @@ public class DocumentDBClient {
         this.host = host;
         this.username = username;
         this.password = password;
-        this.objectMapper = new ObjectMapper();
+        this.objectMapper = JacksonMapper.ofJson();
         this.httpClient = HttpClient.builder()
             .runContext(runContext)
             .build();

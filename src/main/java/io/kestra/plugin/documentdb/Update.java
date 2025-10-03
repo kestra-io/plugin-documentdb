@@ -108,42 +108,7 @@ import java.util.Map;
         )
     }
 )
-public class Update extends Task implements RunnableTask<Update.Output> {
-
-    @Schema(
-        title = "DocumentDB host",
-        description = "The HTTP endpoint URL of your DocumentDB instance"
-    )
-    @NotNull
-    private Property<String> host;
-
-    @Schema(
-        title = "Database name",
-        description = "The name of the database to update in"
-    )
-    @NotNull
-    private Property<String> database;
-
-    @Schema(
-        title = "Collection name",
-        description = "The name of the collection to update in"
-    )
-    @NotNull
-    private Property<String> collection;
-
-    @Schema(
-        title = "Username",
-        description = "DocumentDB username for authentication"
-    )
-    @NotNull
-    private Property<String> username;
-
-    @Schema(
-        title = "Password",
-        description = "DocumentDB password for authentication"
-    )
-    @NotNull
-    private Property<String> password;
+public class Update extends AbstractDocumentDBTask implements RunnableTask<Update.Output> {
 
     @Schema(
         title = "Filter criteria",
