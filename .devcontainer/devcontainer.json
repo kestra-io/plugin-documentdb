@@ -1,10 +1,10 @@
 {
-  "name": "plugin-template",
+  "name": "plugin-documentdb",
   "build": {
     "context": ".",
     "dockerfile": "Dockerfile"
   },
-  "workspaceFolder": "/workspaces/plugin-template",
+  "workspaceFolder": "/workspaces/plugin-documentdb",
   "forwardPorts": [8080],
   "customizations": {
     "vscode": {
