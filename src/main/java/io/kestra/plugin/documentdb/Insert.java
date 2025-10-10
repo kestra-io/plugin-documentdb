@@ -30,7 +30,7 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Insert documents into a DocumentDB collection",
+    title = "Insert documents into a DocumentDB collection.",
     description = "Insert one or more documents into a DocumentDB collection. Can insert a single document or multiple documents (max 10) in one operation."
 )
 @Plugin(
@@ -123,13 +123,13 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
 
     @Schema(
         title = "Document for single insert",
-        description = "Document to insert (for single document insertion). Use this OR documents, not both."
+        description = "Document to insert (for single document insertion). Use this OR `documents`, not both."
     )
     private Property<Map<String, Object>> document;
 
     @Schema(
         title = "Multiple documents",
-        description = "List of documents to insert (max " + MAX_DOCUMENTS_PER_INSERT + "). Use this OR document, not both."
+        description = "List of documents to insert (max " + MAX_DOCUMENTS_PER_INSERT + "). Use this OR `document`, not both."
     )
     private Property<List<Map<String, Object>>> documents;
 

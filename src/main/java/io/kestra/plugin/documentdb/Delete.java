@@ -26,7 +26,7 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Delete documents from a DocumentDB collection",
+    title = "Delete documents from a DocumentDB collection.",
     description = "Delete one or more documents from a DocumentDB collection that match the filter criteria."
 )
 @Plugin(

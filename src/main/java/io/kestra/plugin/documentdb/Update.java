@@ -26,7 +26,7 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Update documents in a DocumentDB collection",
+    title = "Update documents in a DocumentDB collection.",
     description = "Update one or more documents in a DocumentDB collection that match the filter criteria."
 )
 @Plugin(

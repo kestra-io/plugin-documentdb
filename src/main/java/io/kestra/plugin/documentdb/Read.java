@@ -36,7 +36,7 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read documents from a DocumentDB collection",
+    title = "Read documents from a DocumentDB collection.",
     description = "Read documents from a DocumentDB collection with optional filtering, limiting, and aggregation support."
 )
 @Plugin(
@@ -285,25 +285,25 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "Map containing the first row of fetched data.",
+            title = "Map containing the first row of fetched data",
             description = "Only populated if fetchType is FETCH_ONE."
         )
         private final Map<String, Object> row;
 
         @Schema(
-            title = "List of map containing rows of fetched data.",
+            title = "List of map containing rows of fetched data",
             description = "Only populated if fetchType is FETCH."
         )
         private final List<Map<String, Object>> rows;
 
         @Schema(
-            title = "The URI of the result file on Kestra's internal storage (.ion file / Amazon Ion formatted text file).",
+            title = "The URI of the result file on Kestra's internal storage (.ion file / Amazon Ion formatted text file)",
             description = "Only populated if fetchType is STORE."
         )
         private final URI uri;
 
         @Schema(
-            title = "The number of documents returned by the operation."
+            title = "The number of documents returned by the operation"
         )
         private final Long size;
     }
