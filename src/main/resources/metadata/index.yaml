@@ -1,0 +1,8 @@
+group: io.kestra.plugin.documentdb
+name: "documentdb"
+title: "DocumentDB"
+description: "Integrate with DocumentDB, Microsoft's open-source MongoDB-compatible document database built on PostgreSQL."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
