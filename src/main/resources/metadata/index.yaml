@@ -1,8 +1,8 @@
 group: io.kestra.plugin.documentdb
 name: "documentdb"
 title: "DocumentDB"
-description: "Integrate with DocumentDB, Microsoft's open-source MongoDB-compatible document database built on PostgreSQL."
-body: ""
+description: "Tasks that manage DocumentDB collections with MongoDB-compatible insert, query, update, and delete operations."
+body: "Connect to DocumentDB's HTTP API to insert, read, update, and delete collection data. Provide `host`, `database`, `collection`, `username`, and `password`; Insert handles one document or up to 10 via `documents`, Read supports filters or aggregation pipelines with `fetchType` output handling, and Update/Delete apply MongoDB-style filters with `updateMany`/`deleteMany` switches to control scope."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
