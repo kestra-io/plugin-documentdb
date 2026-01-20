@@ -1,4 +1,4 @@
-@PluginSubGroup(title = "DocumentDB", description = "Integrate with DocumentDB, Microsoft's open-source MongoDB-compatible document database built on PostgreSQL.", categories = PluginSubGroup.PluginCategory.DATABASE,
+@PluginSubGroup(title = "DocumentDB", description = "Integrate with DocumentDB, Microsoft's open-source MongoDB-compatible document database built on PostgreSQL.",
     categories = { PluginSubGroup.PluginCategory.DATA }
 )
 package io.kestra.plugin.documentdb;
