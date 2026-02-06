@@ -22,36 +22,36 @@ import lombok.experimental.SuperBuilder;
 public abstract class AbstractDocumentDBTask extends Task {
 
     @Schema(
-        title = "DocumentDB host",
-        description = "The HTTP endpoint URL of your DocumentDB instance"
+        title = "DocumentDB endpoint",
+        description = "Base HTTPS endpoint for the DocumentDB REST API; trailing slash is trimmed before calling /data/v1/action/*."
     )
     @NotNull
     protected Property<String> host;
 
     @Schema(
-        title = "Database name",
-        description = "The name of the database"
+        title = "Target database",
+        description = "Database name used for the operation; expressions are rendered at runtime."
     )
     @NotNull
     protected Property<String> database;
 
     @Schema(
-        title = "Collection name",
-        description = "The name of the collection"
+        title = "Target collection",
+        description = "Collection inside the database where the action is performed."
     )
     @NotNull
     protected Property<String> collection;
 
     @Schema(
-        title = "Username",
-        description = "DocumentDB username for authentication"
+        title = "HTTP username",
+        description = "Basic-auth username for the DocumentDB API; prefer providing via secret."
     )
     @NotNull
     protected Property<String> username;
 
     @Schema(
-        title = "Password",
-        description = "DocumentDB password for authentication"
+        title = "HTTP password",
+        description = "Basic-auth password for the DocumentDB API; prefer providing via secret."
     )
     @NotNull
     protected Property<String> password;

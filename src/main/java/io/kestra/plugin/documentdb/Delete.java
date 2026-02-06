@@ -26,8 +26,8 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Delete documents from a DocumentDB collection.",
-    description = "Delete one or more documents from a DocumentDB collection that match the filter criteria."
+    title = "Delete documents from DocumentDB",
+    description = "Remove one document (default) or every match when `deleteMany` is true. An empty filter with `deleteMany` can wipe the collection, so set filters carefully."
 )
 @Plugin(
     examples = {
@@ -101,14 +101,14 @@ import java.util.Map;
 public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delete.Output> {
 
     @Schema(
-        title = "Filter criteria",
-        description = "MongoDB-style filter to select which documents to delete. Example: {\"status\": \"inactive\", \"age\": {\"$gte\": 18}}"
+        title = "Filter query",
+        description = "MongoDB-style filter that selects documents to delete. Rendered at runtime; an empty filter with `deleteMany` deletes every document. Example: `{\\\"status\\\": \\\"inactive\\\", \\\"age\\\": {\\\"$gte\\\": 18}}`"
     )
     private Property<Map<String, Object>> filter;
 
     @Schema(
-        title = "Delete multiple documents",
-        description = "If true, deletes all documents matching the filter (deleteMany). If false, deletes only the first match (deleteOne)."
+        title = "Delete all matches",
+        description = "Set to true to delete every document matching the filter; default false deletes only the first match."
     )
     @Builder.Default
     private Property<Boolean> deleteMany = Property.ofValue(false);
@@ -161,8 +161,8 @@ public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delet
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "Number of documents deleted",
-            description = "Total count of documents that were successfully deleted"
+            title = "Deleted document count",
+            description = "Total number of documents removed by the operation."
         )
         private final Integer deletedCount;
     }

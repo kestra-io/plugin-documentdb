@@ -30,8 +30,8 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Insert documents into a DocumentDB collection.",
-    description = "Insert one or more documents into a DocumentDB collection. Can insert a single document or multiple documents (max 10) in one operation."
+    title = "Insert documents into DocumentDB",
+    description = "Write one document or a batch (max 10) to the target collection. Rendered inputs support expressions; choose either `document` or `documents`."
 )
 @Plugin(
     examples = {
@@ -122,14 +122,14 @@ import java.util.Map;
 public class Insert extends AbstractDocumentDBTask implements RunnableTask<Insert.Output> {
 
     @Schema(
-        title = "Document for single insert",
-        description = "Document to insert (for single document insertion). Use this OR `documents`, not both."
+        title = "Single document payload",
+        description = "Document to insert when sending one record. Mutually exclusive with `documents`; values are rendered before execution."
     )
     private Property<Map<String, Object>> document;
 
     @Schema(
-        title = "Multiple documents",
-        description = "List of documents to insert (max " + MAX_DOCUMENTS_PER_INSERT + "). Use this OR `document`, not both."
+        title = "Batch documents",
+        description = "List of documents to insert (max " + MAX_DOCUMENTS_PER_INSERT + "). Mutually exclusive with `document`; order is preserved."
     )
     private Property<List<Map<String, Object>>> documents;
 
@@ -194,20 +194,20 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "Inserted document ID",
-            description = "The ID of the first inserted document (for single insert or first of multiple)"
+            title = "First inserted ID",
+            description = "ID of the single document or the first item in a batch; null if none returned."
         )
         private final String insertedId;
 
         @Schema(
-            title = "All inserted document IDs",
-            description = "List of all inserted document IDs"
+            title = "Inserted document IDs",
+            description = "List of all document IDs acknowledged by DocumentDB."
         )
         private final List<String> insertedIds;
 
         @Schema(
-            title = "Number of documents inserted",
-            description = "Total count of documents successfully inserted"
+            title = "Inserted document count",
+            description = "Total number of documents the API reports as inserted."
         )
         private final Integer insertedCount;
     }

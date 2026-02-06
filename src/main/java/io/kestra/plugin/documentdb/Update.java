@@ -26,8 +26,8 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Update documents in a DocumentDB collection.",
-    description = "Update one or more documents in a DocumentDB collection that match the filter criteria."
+    title = "Update documents in DocumentDB",
+    description = "Apply Mongo-style update operators to matching documents. Defaults to updating one document; set `updateMany` to true to affect all matches. An empty filter with `updateMany` can update every document."
 )
 @Plugin(
     examples = {
@@ -111,21 +111,21 @@ import java.util.Map;
 public class Update extends AbstractDocumentDBTask implements RunnableTask<Update.Output> {
 
     @Schema(
-        title = "Filter criteria",
-        description = "MongoDB-style filter to select which documents to update. Example: {\"status\": \"pending\", \"age\": {\"$gte\": 18}}"
+        title = "Filter query",
+        description = "MongoDB-style filter that selects documents to update. Rendered at runtime; an empty filter with `updateMany` updates all documents."
     )
     private Property<Map<String, Object>> filter;
 
     @Schema(
         title = "Update operations",
-        description = "MongoDB-style update operations to apply. Example: {\"$set\": {\"status\": \"active\"}, \"$inc\": {\"count\": 1}}"
+        description = "Required MongoDB update document (e.g., `$set`, `$inc`), rendered before sending to the API."
     )
     @NotNull
     private Property<Map<String, Object>> update;
 
     @Schema(
-        title = "Update multiple documents",
-        description = "If true, updates all documents matching the filter (updateMany). If false, updates only the first match (updateOne)."
+        title = "Update all matches",
+        description = "Set to true to update every document matching the filter; default false updates only the first match."
     )
     @Builder.Default
     private Property<Boolean> updateMany = Property.ofValue(false);
@@ -188,20 +188,20 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "Number of documents matched",
-            description = "Total count of documents that matched the filter criteria"
+            title = "Matched document count",
+            description = "Number of documents that matched the filter."
         )
         private final Integer matchedCount;
 
         @Schema(
-            title = "Number of documents modified",
-            description = "Total count of documents that were actually modified"
+            title = "Modified document count",
+            description = "Number of documents actually updated."
         )
         private final Integer modifiedCount;
 
         @Schema(
             title = "Upserted document ID",
-            description = "ID of the document that was created if upsert was enabled and no match was found"
+            description = "ID of the inserted document when upsert occurs; null otherwise."
         )
         private final String upsertedId;
     }

@@ -36,8 +36,8 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read documents from a DocumentDB collection.",
-    description = "Read documents from a DocumentDB collection with optional filtering, limiting, and aggregation support."
+    title = "Read documents from DocumentDB",
+    description = "Query a collection with an optional filter, skip/limit, or aggregation pipeline. Results are rendered into the selected `fetchType` output; default FETCH returns all rows."
 )
 @Plugin(
     examples = {
@@ -135,31 +135,31 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
 
     @Schema(
         title = "Filter",
-        description = "MongoDB-style filter criteria to apply to the query. Example: {\"status\": \"active\", \"age\": {\"$gte\": 18}}"
+        description = "MongoDB-style filter for the find query, rendered at runtime. Leave empty to scan the full collection."
     )
     private Property<Map<String, Object>> filter;
 
     @Schema(
         title = "Aggregation pipeline",
-        description = "MongoDB aggregation pipeline stages. If provided, this will execute an aggregation instead of a simple find."
+        description = "MongoDB aggregation stages to run instead of a simple find. Overrides `filter`, `skip`, and `limit`."
     )
     private Property<List<Map<String, Object>>> aggregationPipeline;
 
     @Schema(
         title = "Limit",
-        description = "Maximum number of documents to return"
+        description = "Maximum number of documents to return; optional server-side cap."
     )
     private Property<Integer> limit;
 
     @Schema(
         title = "Skip",
-        description = "Number of documents to skip"
+        description = "Number of documents to skip before returning results."
     )
     private Property<Integer> skip;
 
     @Schema(
         title = "Fetch type",
-        description = "How to handle query results. STORE: store all rows to a file, FETCH: output all rows as output variable, FETCH_ONE: output the first row, NONE: do nothing"
+        description = "Controls result handling (default FETCH). STORE writes all rows to Kestra internal storage as Ion, FETCH outputs all rows, FETCH_ONE outputs only the first row, NONE skips output."
     )
     @NotNull
     @Builder.Default
@@ -285,25 +285,26 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "Map containing the first row of fetched data",
-            description = "Only populated if fetchType is FETCH_ONE."
+            title = "First row",
+            description = "First matching document when fetchType is FETCH_ONE; null if no results."
         )
         private final Map<String, Object> row;
 
         @Schema(
-            title = "List of map containing rows of fetched data",
-            description = "Only populated if fetchType is FETCH."
+            title = "Rows",
+            description = "All returned documents when fetchType is FETCH."
         )
         private final List<Map<String, Object>> rows;
 
         @Schema(
-            title = "The URI of the result file on Kestra's internal storage (.ion file / Amazon Ion formatted text file)",
-            description = "Only populated if fetchType is STORE."
+            title = "Result file URI",
+            description = "URI in Kestra internal storage for the Ion result file; only set when fetchType is STORE."
         )
         private final URI uri;
 
         @Schema(
-            title = "The number of documents returned by the operation"
+            title = "Returned document count",
+            description = "Number of documents fetched or stored."
         )
         private final Long size;
     }
