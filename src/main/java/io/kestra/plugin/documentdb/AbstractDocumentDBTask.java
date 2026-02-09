@@ -23,7 +23,7 @@ public abstract class AbstractDocumentDBTask extends Task {
 
     @Schema(
         title = "DocumentDB endpoint",
-        description = "Base HTTPS endpoint for the DocumentDB REST API; trailing slash is trimmed before calling /data/v1/action/*."
+        description = "Base HTTPS endpoint for the DocumentDB REST API; trailing slash is trimmed before calling `/data/v1/action/*`."
     )
     @NotNull
     protected Property<String> host;
