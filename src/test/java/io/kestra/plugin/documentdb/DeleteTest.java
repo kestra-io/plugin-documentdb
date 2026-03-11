@@ -1,19 +1,21 @@
 package io.kestra.plugin.documentdb;
 
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.core.junit.annotations.KestraTest;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.DisplayName;
 
-import java.util.List;
-import java.util.Map;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -63,12 +65,14 @@ class DeleteTest {
         } catch (Exception e) {
             // Expected - connection will fail to the non-existent test host
             // This validates the task can be executed with valid properties
-            assertThat(e.getMessage(), anyOf(
-                containsString("Connection refused"),
-                containsString("Failed to delete document"),
-                containsString("Name or service not known"),
-                containsString("UnknownHostException")
-            ));
+            assertThat(
+                e.getMessage(), anyOf(
+                    containsString("Connection refused"),
+                    containsString("Failed to delete document"),
+                    containsString("Name or service not known"),
+                    containsString("UnknownHostException")
+                )
+            );
         }
     }
 
@@ -98,12 +102,14 @@ class DeleteTest {
         } catch (Exception e) {
             // Expected - connection will fail to the non-existent test host
             // This validates the task can be executed with deleteMany flag
-            assertThat(e.getMessage(), anyOf(
-                containsString("Connection refused"),
-                containsString("Failed to delete document"),
-                containsString("Name or service not known"),
-                containsString("UnknownHostException")
-            ));
+            assertThat(
+                e.getMessage(), anyOf(
+                    containsString("Connection refused"),
+                    containsString("Failed to delete document"),
+                    containsString("Name or service not known"),
+                    containsString("UnknownHostException")
+                )
+            );
         }
     }
 
@@ -120,12 +126,16 @@ class DeleteTest {
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
-            .document(Property.ofValue(Map.of(
-                "_id", "delete-test-doc-" + System.currentTimeMillis(),
-                "name", "Delete Test Document",
-                "status", "to_delete",
-                "created_at", System.currentTimeMillis()
-            )))
+            .document(
+                Property.ofValue(
+                    Map.of(
+                        "_id", "delete-test-doc-" + System.currentTimeMillis(),
+                        "name", "Delete Test Document",
+                        "status", "to_delete",
+                        "created_at", System.currentTimeMillis()
+                    )
+                )
+            )
             .build();
 
         RunContext insertContext = TestsUtils.mockRunContext(runContextFactory, insertTask, Map.of());
@@ -164,11 +174,15 @@ class DeleteTest {
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
-            .documents(Property.ofValue(List.of(
-                Map.of("_id", "delete-many-1-" + System.currentTimeMillis(), "category", "cleanup-test", "status", "expired", "priority", 1),
-                Map.of("_id", "delete-many-2-" + System.currentTimeMillis(), "category", "cleanup-test", "status", "expired", "priority", 2),
-                Map.of("_id", "delete-many-3-" + System.currentTimeMillis(), "category", "cleanup-test", "status", "expired", "priority", 3)
-            )))
+            .documents(
+                Property.ofValue(
+                    List.of(
+                        Map.of("_id", "delete-many-1-" + System.currentTimeMillis(), "category", "cleanup-test", "status", "expired", "priority", 1),
+                        Map.of("_id", "delete-many-2-" + System.currentTimeMillis(), "category", "cleanup-test", "status", "expired", "priority", 2),
+                        Map.of("_id", "delete-many-3-" + System.currentTimeMillis(), "category", "cleanup-test", "status", "expired", "priority", 3)
+                    )
+                )
+            )
             .build();
 
         RunContext insertContext = TestsUtils.mockRunContext(runContextFactory, insertTask, Map.of());

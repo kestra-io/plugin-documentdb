@@ -1,12 +1,23 @@
 package io.kestra.plugin.documentdb;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.URI;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.common.FetchType;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.documentdb.models.DocumentDBRecord;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -17,18 +28,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import org.slf4j.Logger;
 import reactor.core.publisher.Flux;
-import io.kestra.core.serializers.FileSerde;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.net.URI;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -187,8 +187,10 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
 
         if (rAggregationPipeline != null && !rAggregationPipeline.isEmpty()) {
             // Execute aggregation
-            logger.info("Executing aggregation pipeline on DocumentDB database: {} collection: {} with {} stages",
-                rDatabase, rCollection, rAggregationPipeline.size());
+            logger.info(
+                "Executing aggregation pipeline on DocumentDB database: {} collection: {} with {} stages",
+                rDatabase, rCollection, rAggregationPipeline.size()
+            );
             records = client.aggregate(rDatabase, rCollection, rAggregationPipeline);
         } else {
             // Execute find
@@ -277,8 +279,13 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
             this.count = count;
         }
 
-        public URI getUri() { return uri; }
-        public int getCount() { return count; }
+        public URI getUri() {
+            return uri;
+        }
+
+        public int getCount() {
+            return count;
+        }
     }
 
     @Builder

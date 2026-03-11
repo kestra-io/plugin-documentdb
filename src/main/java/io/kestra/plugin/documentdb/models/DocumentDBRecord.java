@@ -1,10 +1,10 @@
 package io.kestra.plugin.documentdb.models;
 
+import java.util.Map;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.util.Map;
 
 /**
  * Represents a document record from DocumentDB.

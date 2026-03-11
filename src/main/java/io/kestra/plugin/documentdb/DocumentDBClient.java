@@ -1,29 +1,30 @@
 package io.kestra.plugin.documentdb;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.kestra.core.http.HttpRequest;
-import io.kestra.core.serializers.JacksonMapper;
-import io.kestra.core.http.HttpResponse;
-import io.kestra.core.http.client.HttpClient;
-import io.kestra.core.http.client.HttpClientResponseException;
-import io.kestra.core.runners.RunContext;
-import io.kestra.plugin.documentdb.models.DocumentDBException;
-import io.kestra.plugin.documentdb.models.DocumentDBRecord;
-import io.kestra.plugin.documentdb.models.InsertResult;
-import io.kestra.plugin.documentdb.models.UpdateResult;
-import io.kestra.plugin.documentdb.models.DeleteResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.kestra.core.http.HttpRequest;
+import io.kestra.core.http.HttpResponse;
+import io.kestra.core.http.client.HttpClient;
+import io.kestra.core.http.client.HttpClientResponseException;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.plugin.documentdb.models.DeleteResult;
+import io.kestra.plugin.documentdb.models.DocumentDBException;
+import io.kestra.plugin.documentdb.models.DocumentDBRecord;
+import io.kestra.plugin.documentdb.models.InsertResult;
+import io.kestra.plugin.documentdb.models.UpdateResult;
 
 /**
  * HTTP client for interacting with DocumentDB REST API.
@@ -68,9 +69,11 @@ public class DocumentDBClient {
             .addHeader("Content-Type", "application/json")
             .addHeader("Accept", "application/json")
             .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
-            .body(HttpRequest.JsonRequestBody.builder()
-                .content(requestBody)
-                .build())
+            .body(
+                HttpRequest.JsonRequestBody.builder()
+                    .content(requestBody)
+                    .build()
+            )
             .build();
 
         logger.debug("Making POST request to: {}", url);
@@ -107,9 +110,11 @@ public class DocumentDBClient {
             .addHeader("Content-Type", "application/json")
             .addHeader("Accept", "application/json")
             .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
-            .body(HttpRequest.JsonRequestBody.builder()
-                .content(requestBody)
-                .build())
+            .body(
+                HttpRequest.JsonRequestBody.builder()
+                    .content(requestBody)
+                    .build()
+            )
             .build();
 
         logger.debug("Making POST request to: {}", url);
@@ -128,7 +133,7 @@ public class DocumentDBClient {
      * Find documents in a collection with optional filter and limit.
      */
     public List<DocumentDBRecord> find(String database, String collection, Map<String, Object> filter,
-                                     Integer limit, Integer skip) throws Exception {
+        Integer limit, Integer skip) throws Exception {
         String url = buildUrl("find");
 
         Map<String, Object> requestBody = new HashMap<>();
@@ -151,9 +156,11 @@ public class DocumentDBClient {
             .addHeader("Content-Type", "application/json")
             .addHeader("Accept", "application/json")
             .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
-            .body(HttpRequest.JsonRequestBody.builder()
-                .content(requestBody)
-                .build())
+            .body(
+                HttpRequest.JsonRequestBody.builder()
+                    .content(requestBody)
+                    .build()
+            )
             .build();
 
         logger.debug("Making POST request to: {}", url);
@@ -186,9 +193,11 @@ public class DocumentDBClient {
             .addHeader("Content-Type", "application/json")
             .addHeader("Accept", "application/json")
             .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
-            .body(HttpRequest.JsonRequestBody.builder()
-                .content(requestBody)
-                .build())
+            .body(
+                HttpRequest.JsonRequestBody.builder()
+                    .content(requestBody)
+                    .build()
+            )
             .build();
 
         logger.debug("Making POST request to: {}", url);
@@ -208,8 +217,7 @@ public class DocumentDBClient {
      */
     private String buildUrl(String action) {
         // Remove trailing slash if present
-        String baseUrl = host.endsWith("/") ?
-            host.substring(0, host.length() - 1) : host;
+        String baseUrl = host.endsWith("/") ? host.substring(0, host.length() - 1) : host;
         return baseUrl + "/data/v1/action/" + action;
     }
 
@@ -289,9 +297,11 @@ public class DocumentDBClient {
             .addHeader("Content-Type", "application/json")
             .addHeader("Accept", "application/json")
             .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
-            .body(HttpRequest.JsonRequestBody.builder()
-                .content(requestBody)
-                .build())
+            .body(
+                HttpRequest.JsonRequestBody.builder()
+                    .content(requestBody)
+                    .build()
+            )
             .build();
 
         logger.debug("Making POST request to: {}", url);
@@ -326,9 +336,11 @@ public class DocumentDBClient {
             .addHeader("Content-Type", "application/json")
             .addHeader("Accept", "application/json")
             .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
-            .body(HttpRequest.JsonRequestBody.builder()
-                .content(requestBody)
-                .build())
+            .body(
+                HttpRequest.JsonRequestBody.builder()
+                    .content(requestBody)
+                    .build()
+            )
             .build();
 
         logger.debug("Making POST request to: {}", url);
@@ -362,9 +374,11 @@ public class DocumentDBClient {
             .addHeader("Content-Type", "application/json")
             .addHeader("Accept", "application/json")
             .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
-            .body(HttpRequest.JsonRequestBody.builder()
-                .content(requestBody)
-                .build())
+            .body(
+                HttpRequest.JsonRequestBody.builder()
+                    .content(requestBody)
+                    .build()
+            )
             .build();
 
         logger.debug("Making POST request to: {}", url);
@@ -398,9 +412,11 @@ public class DocumentDBClient {
             .addHeader("Content-Type", "application/json")
             .addHeader("Accept", "application/json")
             .addHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))
-            .body(HttpRequest.JsonRequestBody.builder()
-                .content(requestBody)
-                .build())
+            .body(
+                HttpRequest.JsonRequestBody.builder()
+                    .content(requestBody)
+                    .build()
+            )
             .build();
 
         logger.debug("Making POST request to: {}", url);

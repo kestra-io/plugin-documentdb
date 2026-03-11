@@ -1,18 +1,20 @@
 package io.kestra.plugin.documentdb;
 
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.common.FetchType;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.core.junit.annotations.KestraTest;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.TestInstance;
 
-import java.util.List;
-import java.util.Map;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -43,11 +45,15 @@ class ReadTest {
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
-            .documents(Property.ofValue(List.of(
-                Map.of("_id", "test-" + timestamp + "-1", "name", "Test User 1", "status", "active", "age", 25, "roles", List.of("user", "editor")),
-                Map.of("_id", "test-" + timestamp + "-2", "name", "Test User 2", "status", "active", "age", 30, "roles", List.of("admin")),
-                Map.of("_id", "test-" + timestamp + "-3", "name", "Test User 3", "status", "inactive", "age", 17, "department", "Sales")
-            )))
+            .documents(
+                Property.ofValue(
+                    List.of(
+                        Map.of("_id", "test-" + timestamp + "-1", "name", "Test User 1", "status", "active", "age", 25, "roles", List.of("user", "editor")),
+                        Map.of("_id", "test-" + timestamp + "-2", "name", "Test User 2", "status", "active", "age", 30, "roles", List.of("admin")),
+                        Map.of("_id", "test-" + timestamp + "-3", "name", "Test User 3", "status", "inactive", "age", 17, "department", "Sales")
+                    )
+                )
+            )
             .build();
 
         RunContext setupContext = TestsUtils.mockRunContext(runContextFactory, insertTask, Map.of());
@@ -108,7 +114,6 @@ class ReadTest {
         assertThat(output.getSize(), greaterThan(0L));
     }
 
-
     @Test
     void shouldValidateTaskWithFilter() throws Exception {
         Map<String, Object> filter = Map.of(
@@ -148,11 +153,13 @@ class ReadTest {
     void shouldValidateTaskWithAggregationPipeline() throws Exception {
         List<Map<String, Object>> pipeline = List.of(
             Map.of("$match", Map.of("status", "active")),
-            Map.of("$group", Map.of(
-                "_id", "$status",
-                "count", Map.of("$sum", 1),
-                "avgAge", Map.of("$avg", "$age")
-            ))
+            Map.of(
+                "$group", Map.of(
+                    "_id", "$status",
+                    "count", Map.of("$sum", 1),
+                    "avgAge", Map.of("$avg", "$age")
+                )
+            )
         );
 
         Read task = Read.builder()

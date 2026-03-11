@@ -1,22 +1,24 @@
 package io.kestra.plugin.documentdb;
 
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
+
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.common.FetchType;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.core.models.tasks.common.FetchType;
-import io.kestra.core.junit.annotations.KestraTest;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.TestInstance;
 
-import java.util.List;
-import java.util.Map;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -57,11 +59,15 @@ class DocumentDBIntegrationTest {
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
-            .documents(Property.ofValue(List.of(
-                Map.of("_id", "setup-doc-" + System.currentTimeMillis() + "-1", "name", "Setup Document 1", "category", "A", "priority", 1),
-                Map.of("_id", "setup-doc-" + System.currentTimeMillis() + "-2", "name", "Setup Document 2", "category", "B", "priority", 2),
-                Map.of("_id", "setup-doc-" + System.currentTimeMillis() + "-3", "name", "Setup Document 3", "category", "A", "priority", 3)
-            )))
+            .documents(
+                Property.ofValue(
+                    List.of(
+                        Map.of("_id", "setup-doc-" + System.currentTimeMillis() + "-1", "name", "Setup Document 1", "category", "A", "priority", 1),
+                        Map.of("_id", "setup-doc-" + System.currentTimeMillis() + "-2", "name", "Setup Document 2", "category", "B", "priority", 2),
+                        Map.of("_id", "setup-doc-" + System.currentTimeMillis() + "-3", "name", "Setup Document 3", "category", "A", "priority", 3)
+                    )
+                )
+            )
             .build();
 
         RunContext setupContext = TestsUtils.mockRunContext(runContextFactory, insertTask, Map.of());
@@ -75,7 +81,7 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("fetch-one-real-test")
             .type(Read.class.getName())
-.host(Property.ofValue(HOST))
+            .host(Property.ofValue(HOST))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
@@ -99,7 +105,7 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("limit-skip-real-test")
             .type(Read.class.getName())
-.host(Property.ofValue(HOST))
+            .host(Property.ofValue(HOST))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
@@ -125,20 +131,26 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("aggregation-real-test")
             .type(Read.class.getName())
-.host(Property.ofValue(HOST))
+            .host(Property.ofValue(HOST))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
-            .aggregationPipeline(Property.ofValue(List.of(
-                Map.of("$match", Map.of("category", Map.of("$exists", true))),
-                Map.of("$group", Map.of(
-                    "_id", "$category",
-                    "count", Map.of("$sum", 1),
-                    "avgPriority", Map.of("$avg", "$priority")
-                )),
-                Map.of("$sort", Map.of("count", -1))
-            )))
+            .aggregationPipeline(
+                Property.ofValue(
+                    List.of(
+                        Map.of("$match", Map.of("category", Map.of("$exists", true))),
+                        Map.of(
+                            "$group", Map.of(
+                                "_id", "$category",
+                                "count", Map.of("$sum", 1),
+                                "avgPriority", Map.of("$avg", "$priority")
+                            )
+                        ),
+                        Map.of("$sort", Map.of("count", -1))
+                    )
+                )
+            )
             .fetchType(Property.ofValue(FetchType.FETCH))
             .build();
 

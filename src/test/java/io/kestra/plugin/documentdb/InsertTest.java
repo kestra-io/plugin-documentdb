@@ -1,20 +1,22 @@
 package io.kestra.plugin.documentdb;
 
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.common.FetchType;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.core.junit.annotations.KestraTest;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.DisplayName;
 
-import java.util.List;
-import java.util.Map;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -63,12 +65,14 @@ class InsertTest {
         } catch (Exception e) {
             // Expected - connection will fail to the non-existent test host
             // This validates the task can be executed with valid properties
-            assertThat(e.getMessage(), anyOf(
-                containsString("Connection refused"),
-                containsString("Failed to insert document"),
-                containsString("Name or service not known"),
-                containsString("UnknownHostException")
-            ));
+            assertThat(
+                e.getMessage(), anyOf(
+                    containsString("Connection refused"),
+                    containsString("Failed to insert document"),
+                    containsString("Name or service not known"),
+                    containsString("UnknownHostException")
+                )
+            );
         }
     }
 
@@ -160,13 +164,17 @@ class InsertTest {
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
-            .document(Property.ofValue(Map.of(
-                "_id", "single-test-doc-" + System.currentTimeMillis(),
-                "name", "Integration Test Document",
-                "value", 42,
-                "active", true,
-                "timestamp", System.currentTimeMillis()
-            )))
+            .document(
+                Property.ofValue(
+                    Map.of(
+                        "_id", "single-test-doc-" + System.currentTimeMillis(),
+                        "name", "Integration Test Document",
+                        "value", 42,
+                        "active", true,
+                        "timestamp", System.currentTimeMillis()
+                    )
+                )
+            )
             .build();
 
         RunContext insertContext = TestsUtils.mockRunContext(runContextFactory, insertTask, Map.of());
@@ -189,11 +197,15 @@ class InsertTest {
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
-            .documents(Property.ofValue(List.of(
-                Map.of("_id", "multi-test-doc-1-" + System.currentTimeMillis(), "name", "Document 1", "category", "A", "priority", 1),
-                Map.of("_id", "multi-test-doc-2-" + System.currentTimeMillis(), "name", "Document 2", "category", "B", "priority", 2),
-                Map.of("_id", "multi-test-doc-3-" + System.currentTimeMillis(), "name", "Document 3", "category", "A", "priority", 3)
-            )))
+            .documents(
+                Property.ofValue(
+                    List.of(
+                        Map.of("_id", "multi-test-doc-1-" + System.currentTimeMillis(), "name", "Document 1", "category", "A", "priority", 1),
+                        Map.of("_id", "multi-test-doc-2-" + System.currentTimeMillis(), "name", "Document 2", "category", "B", "priority", 2),
+                        Map.of("_id", "multi-test-doc-3-" + System.currentTimeMillis(), "name", "Document 3", "category", "A", "priority", 3)
+                    )
+                )
+            )
             .build();
 
         RunContext insertContext = TestsUtils.mockRunContext(runContextFactory, insertTask, Map.of());
@@ -219,13 +231,17 @@ class InsertTest {
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
-            .document(Property.ofValue(Map.of(
-                "_id", uniqueId,
-                "name", "Verify Integration Test Document",
-                "value", 99,
-                "active", true,
-                "timestamp", System.currentTimeMillis()
-            )))
+            .document(
+                Property.ofValue(
+                    Map.of(
+                        "_id", uniqueId,
+                        "name", "Verify Integration Test Document",
+                        "value", 99,
+                        "active", true,
+                        "timestamp", System.currentTimeMillis()
+                    )
+                )
+            )
             .build();
 
         RunContext insertContext = TestsUtils.mockRunContext(runContextFactory, insertTask, Map.of());

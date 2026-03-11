@@ -1,19 +1,21 @@
 package io.kestra.plugin.documentdb;
 
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.core.junit.annotations.KestraTest;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.DisplayName;
 
-import java.util.List;
-import java.util.Map;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -65,12 +67,14 @@ class UpdateTest {
         } catch (Exception e) {
             // Expected - connection will fail to the non-existent test host
             // This validates the task can be executed with valid properties
-            assertThat(e.getMessage(), anyOf(
-                containsString("Connection refused"),
-                containsString("Failed to update document"),
-                containsString("Name or service not known"),
-                containsString("UnknownHostException")
-            ));
+            assertThat(
+                e.getMessage(), anyOf(
+                    containsString("Connection refused"),
+                    containsString("Failed to update document"),
+                    containsString("Name or service not known"),
+                    containsString("UnknownHostException")
+                )
+            );
         }
     }
 
@@ -95,10 +99,12 @@ class UpdateTest {
         } catch (Exception e) {
             // The validation can happen at framework level (ConstraintViolationException)
             // or our custom level (IllegalArgumentException)
-            assertThat(e.getMessage(), anyOf(
-                containsString("must not be null"),
-                containsString("Update operations must be provided")
-            ));
+            assertThat(
+                e.getMessage(), anyOf(
+                    containsString("must not be null"),
+                    containsString("Update operations must be provided")
+                )
+            );
         }
     }
 
@@ -129,12 +135,14 @@ class UpdateTest {
         } catch (Exception e) {
             // Expected - connection will fail to the non-existent test host
             // This validates the task can be executed with updateMany flag
-            assertThat(e.getMessage(), anyOf(
-                containsString("Connection refused"),
-                containsString("Failed to update document"),
-                containsString("Name or service not known"),
-                containsString("UnknownHostException")
-            ));
+            assertThat(
+                e.getMessage(), anyOf(
+                    containsString("Connection refused"),
+                    containsString("Failed to update document"),
+                    containsString("Name or service not known"),
+                    containsString("UnknownHostException")
+                )
+            );
         }
     }
 
@@ -151,12 +159,16 @@ class UpdateTest {
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
-            .document(Property.ofValue(Map.of(
-                "_id", "update-test-doc-" + System.currentTimeMillis(),
-                "name", "Update Test Document",
-                "status", "pending",
-                "count", 0
-            )))
+            .document(
+                Property.ofValue(
+                    Map.of(
+                        "_id", "update-test-doc-" + System.currentTimeMillis(),
+                        "name", "Update Test Document",
+                        "status", "pending",
+                        "count", 0
+                    )
+                )
+            )
             .build();
 
         RunContext insertContext = TestsUtils.mockRunContext(runContextFactory, insertTask, Map.of());
@@ -173,10 +185,14 @@ class UpdateTest {
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(Map.of("_id", docId)))
-            .update(Property.ofValue(Map.of(
-                "$set", Map.of("status", "updated", "updated_at", System.currentTimeMillis()),
-                "$inc", Map.of("count", 5)
-            )))
+            .update(
+                Property.ofValue(
+                    Map.of(
+                        "$set", Map.of("status", "updated", "updated_at", System.currentTimeMillis()),
+                        "$inc", Map.of("count", 5)
+                    )
+                )
+            )
             .updateMany(Property.ofValue(false))
             .build();
 
@@ -201,11 +217,15 @@ class UpdateTest {
             .collection(Property.ofValue(COLLECTION))
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
-            .documents(Property.ofValue(List.of(
-                Map.of("_id", "update-many-1-" + System.currentTimeMillis(), "category", "bulk-test", "status", "pending", "priority", 1),
-                Map.of("_id", "update-many-2-" + System.currentTimeMillis(), "category", "bulk-test", "status", "pending", "priority", 2),
-                Map.of("_id", "update-many-3-" + System.currentTimeMillis(), "category", "bulk-test", "status", "pending", "priority", 3)
-            )))
+            .documents(
+                Property.ofValue(
+                    List.of(
+                        Map.of("_id", "update-many-1-" + System.currentTimeMillis(), "category", "bulk-test", "status", "pending", "priority", 1),
+                        Map.of("_id", "update-many-2-" + System.currentTimeMillis(), "category", "bulk-test", "status", "pending", "priority", 2),
+                        Map.of("_id", "update-many-3-" + System.currentTimeMillis(), "category", "bulk-test", "status", "pending", "priority", 3)
+                    )
+                )
+            )
             .build();
 
         RunContext insertContext = TestsUtils.mockRunContext(runContextFactory, insertTask, Map.of());
@@ -221,9 +241,13 @@ class UpdateTest {
             .username(Property.ofValue(USERNAME))
             .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(Map.of("category", "bulk-test")))
-            .update(Property.ofValue(Map.of(
-                "$set", Map.of("status", "bulk-updated", "batch_update_time", System.currentTimeMillis())
-            )))
+            .update(
+                Property.ofValue(
+                    Map.of(
+                        "$set", Map.of("status", "bulk-updated", "batch_update_time", System.currentTimeMillis())
+                    )
+                )
+            )
             .updateMany(Property.ofValue(true))
             .build();
 
