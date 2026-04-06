@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 /**
  * Abstract base class for DocumentDB tasks.
@@ -27,6 +28,7 @@ public abstract class AbstractDocumentDBTask extends Task {
         description = "Base HTTPS endpoint for the DocumentDB REST API; trailing slash is trimmed before calling `/data/v1/action/*`."
     )
     @NotNull
+    @PluginProperty(group = "main")
     protected Property<String> host;
 
     @Schema(
@@ -34,6 +36,7 @@ public abstract class AbstractDocumentDBTask extends Task {
         description = "Database name used for the operation; expressions are rendered at runtime."
     )
     @NotNull
+    @PluginProperty(group = "main")
     protected Property<String> database;
 
     @Schema(
@@ -41,6 +44,7 @@ public abstract class AbstractDocumentDBTask extends Task {
         description = "Collection inside the database where the action is performed."
     )
     @NotNull
+    @PluginProperty(group = "main")
     protected Property<String> collection;
 
     @Schema(
@@ -48,6 +52,7 @@ public abstract class AbstractDocumentDBTask extends Task {
         description = "Basic-auth username for the DocumentDB API; prefer providing via secret."
     )
     @NotNull
+    @PluginProperty(group = "main")
     protected Property<String> username;
 
     @Schema(
@@ -55,5 +60,6 @@ public abstract class AbstractDocumentDBTask extends Task {
         description = "Basic-auth password for the DocumentDB API; prefer providing via secret."
     )
     @NotNull
+    @PluginProperty(group = "main")
     protected Property<String> password;
 }
