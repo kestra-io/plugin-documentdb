@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -114,6 +115,7 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
         title = "Filter query",
         description = "MongoDB-style filter that selects documents to update. Rendered at runtime; an empty filter with `updateMany` updates all documents."
     )
+    @PluginProperty(group = "processing")
     private Property<Map<String, Object>> filter;
 
     @Schema(
@@ -121,6 +123,7 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
         description = "Required MongoDB update document (e.g., `$set`, `$inc`), rendered before sending to the API."
     )
     @NotNull
+    @PluginProperty(group = "main")
     private Property<Map<String, Object>> update;
 
     @Schema(
@@ -128,6 +131,7 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
         description = "Set to true to update every document matching the filter; default false updates only the first match."
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<Boolean> updateMany = Property.ofValue(false);
 
     @Override

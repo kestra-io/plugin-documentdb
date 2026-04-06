@@ -29,6 +29,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -137,24 +138,28 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
         title = "Filter",
         description = "MongoDB-style filter for the find query, rendered at runtime. Leave empty to scan the full collection."
     )
+    @PluginProperty(group = "processing")
     private Property<Map<String, Object>> filter;
 
     @Schema(
         title = "Aggregation pipeline",
         description = "MongoDB aggregation stages to run instead of a simple find. Overrides `filter`, `skip`, and `limit`."
     )
+    @PluginProperty(group = "advanced")
     private Property<List<Map<String, Object>>> aggregationPipeline;
 
     @Schema(
         title = "Limit",
         description = "Maximum number of documents to return; optional server-side cap."
     )
+    @PluginProperty(group = "processing")
     private Property<Integer> limit;
 
     @Schema(
         title = "Skip",
         description = "Number of documents to skip before returning results."
     )
+    @PluginProperty(group = "advanced")
     private Property<Integer> skip;
 
     @Schema(
@@ -163,6 +168,7 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
     )
     @NotNull
     @Builder.Default
+    @PluginProperty(group = "processing")
     private Property<FetchType> fetchType = Property.ofValue(FetchType.FETCH);
 
     @Override

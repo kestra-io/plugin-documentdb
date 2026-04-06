@@ -18,6 +18,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -103,6 +104,7 @@ public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delet
         title = "Filter query",
         description = "MongoDB-style filter that selects documents to delete. Rendered at runtime; an empty filter with `deleteMany` deletes every document. Example: `{\\\"status\\\": \\\"inactive\\\", \\\"age\\\": {\\\"$gte\\\": 18}}`"
     )
+    @PluginProperty(group = "processing")
     private Property<Map<String, Object>> filter;
 
     @Schema(
@@ -110,6 +112,7 @@ public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delet
         description = "Set to true to delete every document matching the filter; default false deletes only the first match."
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<Boolean> deleteMany = Property.ofValue(false);
 
     @Override

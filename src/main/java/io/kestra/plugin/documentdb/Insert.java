@@ -21,6 +21,7 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import static io.kestra.plugin.documentdb.DocumentDBClient.MAX_DOCUMENTS_PER_INSERT;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -123,12 +124,14 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
         title = "Single document payload",
         description = "Document to insert when sending one record. Mutually exclusive with `documents`; values are rendered before execution."
     )
+    @PluginProperty(group = "advanced")
     private Property<Map<String, Object>> document;
 
     @Schema(
         title = "Batch documents",
         description = "List of documents to insert (max " + MAX_DOCUMENTS_PER_INSERT + "). Mutually exclusive with `document`; order is preserved."
     )
+    @PluginProperty(group = "advanced")
     private Property<List<Map<String, Object>>> documents;
 
     @Override
