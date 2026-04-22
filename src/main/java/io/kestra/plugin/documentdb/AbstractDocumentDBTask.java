@@ -52,7 +52,7 @@ public abstract class AbstractDocumentDBTask extends Task {
         description = "Basic-auth username for the DocumentDB API; prefer providing via secret."
     )
     @NotNull
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "main", secret = true)
     protected Property<String> username;
 
     @Schema(
@@ -60,6 +60,6 @@ public abstract class AbstractDocumentDBTask extends Task {
         description = "Basic-auth password for the DocumentDB API; prefer providing via secret."
     )
     @NotNull
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "main", secret = true)
     protected Property<String> password;
 }
