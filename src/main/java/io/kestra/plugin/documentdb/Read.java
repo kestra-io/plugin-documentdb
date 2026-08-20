@@ -164,7 +164,7 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
 
     @Schema(
         title = "Fetch type",
-        description = "Controls result handling (default FETCH). STORE writes all rows to Kestra internal storage as Ion, FETCH outputs all rows, FETCH_ONE outputs only the first row, NONE skips output."
+        description = "Controls result handling (default FETCH). STORE writes all rows to Kestra internal storage as ION, FETCH outputs all rows, FETCH_ONE outputs only the first row, NONE skips output."
     )
     @NotNull
     @Builder.Default
@@ -311,7 +311,7 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
 
         @Schema(
             title = "Result file URI",
-            description = "URI in Kestra internal storage for the Ion result file; only set when fetchType is STORE."
+            description = "URI in Kestra internal storage for the ION result file; only set when fetchType is STORE."
         )
         private final URI uri;
 

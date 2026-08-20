@@ -1,6 +1,6 @@
 # How to use the DocumentDB plugin
 
-Read and write documents in Amazon DocumentDB (MongoDB-compatible) from Kestra flows.
+Read and write documents in DocumentDB — the open-source, MongoDB-compatible document database (built on PostgreSQL) — from Kestra flows, via its HTTP data API.
 
 ## Authentication
 
