@@ -4,7 +4,7 @@ Read and write documents in DocumentDB — the open-source, MongoDB-compatible d
 
 ## Authentication
 
-Set `host` (required, the HTTPS endpoint), `username` (required), and `password` (required) on every task, along with `database` and `collection`. Authentication uses HTTP Basic auth. Store secrets in [secrets](https://kestra.io/docs/concepts/secret) and apply connection properties globally with [plugin defaults](https://kestra.io/docs/workflow-components/plugin-defaults).
+Set `host` (required, the HTTPS endpoint), `username` (required), and `password` (required) on every task, along with `database` and `collection`. Authentication uses HTTP Basic auth. Store secrets in [secrets](https://kestra.io/docs/concepts/secret) and set connection properties on each task.
 
 ## Tasks
 
