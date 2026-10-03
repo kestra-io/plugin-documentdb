@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.common.FetchType;
@@ -52,11 +53,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: find_users
                     type: io.kestra.plugin.documentdb.Read
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "mongodb://testuser:testpass@localhost:27017/myapp?authSource=admin"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     fetchType: FETCH
                 """
         ),
@@ -70,11 +69,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: find_filtered_users
                     type: io.kestra.plugin.documentdb.Read
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "mongodb://testuser:testpass@localhost:27017/myapp?authSource=admin"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     filter:
                       status: "active"
                       age:
@@ -93,11 +90,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: find_one_user
                     type: io.kestra.plugin.documentdb.Read
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "mongodb://testuser:testpass@localhost:27017/myapp?authSource=admin"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     filter:
                       email: "john.doe@example.com"
                     fetchType: FETCH_ONE
@@ -113,11 +108,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: aggregate_users
                     type: io.kestra.plugin.documentdb.Read
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "mongodb://testuser:testpass@localhost:27017/myapp?authSource=admin"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     aggregationPipeline:
                       - $match:
                           status: "active"
@@ -176,18 +169,16 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
         Logger logger = runContext.logger();
 
         // Render properties
-        String rHost = runContext.render(this.host).as(String.class).orElseThrow();
+        String rConnectionString = runContext.render(this.connectionString).as(String.class).orElseThrow();
         String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
         String rCollection = runContext.render(this.collection).as(String.class).orElseThrow();
-        String rUsername = runContext.render(this.username).as(String.class).orElseThrow();
-        String rPassword = runContext.render(this.password).as(String.class).orElseThrow();
         Map<String, Object> rFilter = runContext.render(this.filter).asMap(String.class, Object.class);
         List<Map<String, Object>> rAggregationPipeline = runContext.render(this.aggregationPipeline).asList(Map.class);
         Integer rLimit = runContext.render(this.limit).as(Integer.class).orElse(null);
         Integer rSkip = runContext.render(this.skip).as(Integer.class).orElse(null);
         FetchType rFetchType = runContext.render(this.fetchType).as(FetchType.class).orElse(FetchType.FETCH);
 
-        DocumentDBClient client = new DocumentDBClient(rHost, rUsername, rPassword, runContext);
+        DocumentDBClient client = new DocumentDBClient(rConnectionString);
 
         List<DocumentDBRecord> records;
 
@@ -255,8 +246,8 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
             // Create a temporary file for Ion format
             File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
-            // Stream records via Flux and write to file using FileSerde
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)) {
+                // Stream records via Flux and write to file using FileSerde
                 Flux<Map<String, Object>> recordFlux = Flux.fromIterable(records)
                     .map(this::convertRecordToMap);
 

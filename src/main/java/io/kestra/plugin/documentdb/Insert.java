@@ -44,11 +44,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: insert_user
                     type: io.kestra.plugin.documentdb.Insert
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "mongodb://testuser:testpass@localhost:27017/myapp?authSource=admin"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     document:
                       name: "John Doe"
                       email: "john.doe@example.com"
@@ -66,11 +64,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: insert_product_batch
                     type: io.kestra.plugin.documentdb.Insert
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "mongodb://testuser:testpass@localhost:27017/inventory?authSource=admin"
                     database: "inventory"
                     collection: "products"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     documents:
                       - name: "Laptop"
                         price: 999.99
@@ -103,11 +99,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: insert_order
                     type: io.kestra.plugin.documentdb.Insert
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "mongodb://testuser:testpass@localhost:27017/sales?authSource=admin"
                     database: "sales"
                     collection: "orders"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     document:
                       customer_id: "{{ inputs.customer_id }}"
                       product: "{{ inputs.product_name }}"
@@ -139,11 +133,9 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
         Logger logger = runContext.logger();
 
         // Render properties
-        String rHost = runContext.render(this.host).as(String.class).orElseThrow();
+        String rConnectionString = runContext.render(this.connectionString).as(String.class).orElseThrow();
         String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
         String rCollection = runContext.render(this.collection).as(String.class).orElseThrow();
-        String rUsername = runContext.render(this.username).as(String.class).orElseThrow();
-        String rPassword = runContext.render(this.password).as(String.class).orElseThrow();
         Map<String, Object> rDocument = runContext.render(this.document).asMap(String.class, Object.class);
         List<Map<String, Object>> rDocuments = runContext.render(this.documents).asList(Map.class);
 
@@ -156,7 +148,7 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
             throw new IllegalArgumentException("Cannot specify both 'document' and 'documents'. Use one or the other.");
         }
 
-        DocumentDBClient client = new DocumentDBClient(rHost, rUsername, rPassword, runContext);
+        DocumentDBClient client = new DocumentDBClient(rConnectionString);
 
         if (rDocument != null && !rDocument.isEmpty()) {
             // Insert single document

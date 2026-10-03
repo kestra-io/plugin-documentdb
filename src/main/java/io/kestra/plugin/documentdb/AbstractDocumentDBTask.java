@@ -1,8 +1,8 @@
 package io.kestra.plugin.documentdb;
 
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
@@ -10,7 +10,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import io.kestra.core.models.annotations.PluginProperty;
 
 /**
  * Abstract base class for DocumentDB tasks.
@@ -24,12 +23,12 @@ import io.kestra.core.models.annotations.PluginProperty;
 public abstract class AbstractDocumentDBTask extends Task {
 
     @Schema(
-        title = "DocumentDB endpoint",
-        description = "Base HTTPS endpoint for the DocumentDB REST API; trailing slash is trimmed before calling `/data/v1/action/*`."
+        title = "MongoDB connection string",
+        description = "MongoDB connection string for the target database, for example mongodb://user:password@host:27017/database?authSource=admin."
     )
     @NotNull
-    @PluginProperty(group = "main")
-    protected Property<String> host;
+    @PluginProperty(group = "main", secret = true)
+    protected Property<String> connectionString;
 
     @Schema(
         title = "Target database",
@@ -46,20 +45,4 @@ public abstract class AbstractDocumentDBTask extends Task {
     @NotNull
     @PluginProperty(group = "main")
     protected Property<String> collection;
-
-    @Schema(
-        title = "HTTP username",
-        description = "Basic-auth username for the DocumentDB API; prefer providing via secret."
-    )
-    @NotNull
-    @PluginProperty(group = "main", secret = true)
-    protected Property<String> username;
-
-    @Schema(
-        title = "HTTP password",
-        description = "Basic-auth password for the DocumentDB API; prefer providing via secret."
-    )
-    @NotNull
-    @PluginProperty(group = "main", secret = true)
-    protected Property<String> password;
 }
