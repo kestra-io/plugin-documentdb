@@ -26,12 +26,9 @@ class ReadTest {
     @Inject
     private RunContextFactory runContextFactory;
 
-    // Real connection details for local DocumentDB container
-    private static final String HOST = "http://localhost:10260";
+    private static final String CONNECTION_STRING = "mongodb://testuser:testpass@localhost:27017/test_db?authSource=admin";
     private static final String DATABASE = "test_db";
     private static final String COLLECTION = "read_test";
-    private static final String USERNAME = "testuser";
-    private static final String PASSWORD = "testpass";
 
     @BeforeAll
     void setupTestData() throws Exception {
@@ -40,11 +37,9 @@ class ReadTest {
         Insert insertTask = Insert.builder()
             .id("setup-read-test-data")
             .type(Insert.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .documents(
                 Property.ofValue(
                     List.of(
@@ -65,22 +60,18 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-read")
             .type(Read.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .fetchType(Property.ofValue(FetchType.FETCH))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
         assertThat(task, is(notNullValue()));
-        assertThat(task.getHost(), is(notNullValue()));
+        assertThat(task.getConnectionString(), is(notNullValue()));
         assertThat(task.getDatabase(), is(notNullValue()));
         assertThat(task.getCollection(), is(notNullValue()));
-        assertThat(task.getUsername(), is(notNullValue()));
-        assertThat(task.getPassword(), is(notNullValue()));
         assertThat(task.getFetchType(), is(notNullValue()));
 
         // Execute the task and verify it works with real database
@@ -95,11 +86,9 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-default")
             .type(Read.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
@@ -124,11 +113,9 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-filter")
             .type(Read.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(filter))
             .fetchType(Property.ofValue(FetchType.FETCH))
             .build();
@@ -165,11 +152,9 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-aggregation")
             .type(Read.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .aggregationPipeline(Property.ofValue(pipeline))
             .fetchType(Property.ofValue(FetchType.FETCH))
             .build();
@@ -196,11 +181,9 @@ class ReadTest {
             Read task = Read.builder()
                 .id("test-fetchtype-" + fetchType.name())
                 .type(Read.class.getName())
-                .host(Property.ofValue(HOST))
+                .connectionString(Property.ofValue(CONNECTION_STRING))
                 .database(Property.ofValue(DATABASE))
                 .collection(Property.ofValue(COLLECTION))
-                .username(Property.ofValue(USERNAME))
-                .password(Property.ofValue(PASSWORD))
                 .fetchType(Property.ofValue(fetchType))
                 .build();
 

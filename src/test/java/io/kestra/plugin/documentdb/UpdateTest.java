@@ -24,12 +24,10 @@ import static org.hamcrest.Matchers.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class UpdateTest {
 
-    // Real connection details for local DocumentDB container
-    private static final String HOST = "http://localhost:10260";
+    private static final String CONNECTION_STRING = "mongodb://testuser:testpass@localhost:27017/test_db?authSource=admin";
     private static final String DATABASE = "test_db";
+    private static final String INVALID_CONNECTION_STRING = "mongodb://127.0.0.1:1/test_db?serverSelectionTimeoutMS=1000&connectTimeoutMS=1000";
     private static final String COLLECTION = "update_test";
-    private static final String USERNAME = "testuser";
-    private static final String PASSWORD = "testpass";
 
     @Inject
     private RunContextFactory runContextFactory;
@@ -39,11 +37,9 @@ class UpdateTest {
         Update task = Update.builder()
             .id("test-update")
             .type(Update.class.getName())
-            .host(Property.ofValue("https://test-documentdb.com"))
+            .connectionString(Property.ofValue(INVALID_CONNECTION_STRING))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
-            .username(Property.ofValue("testuser"))
-            .password(Property.ofValue("testpass"))
             .filter(Property.ofValue(Map.of("name", "Test Document")))
             .update(Property.ofValue(Map.of("$set", Map.of("status", "updated"))))
             .build();
@@ -51,11 +47,9 @@ class UpdateTest {
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
         // This should not throw an exception for validation
-        assertThat(task.getHost(), is(notNullValue()));
+        assertThat(task.getConnectionString(), is(notNullValue()));
         assertThat(task.getDatabase(), is(notNullValue()));
         assertThat(task.getCollection(), is(notNullValue()));
-        assertThat(task.getUsername(), is(notNullValue()));
-        assertThat(task.getPassword(), is(notNullValue()));
         assertThat(task.getFilter(), is(notNullValue()));
         assertThat(task.getUpdate(), is(notNullValue()));
 
@@ -83,11 +77,9 @@ class UpdateTest {
         Update task = Update.builder()
             .id("test-missing-update")
             .type(Update.class.getName())
-            .host(Property.ofValue("https://test-documentdb.com"))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
-            .username(Property.ofValue("testuser"))
-            .password(Property.ofValue("testpass"))
             .filter(Property.ofValue(Map.of("name", "Test Document")))
             .build();
 
@@ -113,11 +105,9 @@ class UpdateTest {
         Update task = Update.builder()
             .id("test-update-many")
             .type(Update.class.getName())
-            .host(Property.ofValue("https://test-documentdb.com"))
+            .connectionString(Property.ofValue(INVALID_CONNECTION_STRING))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
-            .username(Property.ofValue("testuser"))
-            .password(Property.ofValue("testpass"))
             .filter(Property.ofValue(Map.of("status", "pending")))
             .update(Property.ofValue(Map.of("$set", Map.of("status", "processed"))))
             .updateMany(Property.ofValue(true))
@@ -154,11 +144,9 @@ class UpdateTest {
         Insert insertTask = Insert.builder()
             .id("setup-update-test")
             .type(Insert.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .document(
                 Property.ofValue(
                     Map.of(
@@ -179,11 +167,9 @@ class UpdateTest {
         Update updateTask = Update.builder()
             .id("update-single-integration-test")
             .type(Update.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(Map.of("_id", docId)))
             .update(
                 Property.ofValue(
@@ -212,11 +198,9 @@ class UpdateTest {
         Insert insertTask = Insert.builder()
             .id("setup-update-many-test")
             .type(Insert.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .documents(
                 Property.ofValue(
                     List.of(
@@ -235,11 +219,9 @@ class UpdateTest {
         Update updateTask = Update.builder()
             .id("update-many-integration-test")
             .type(Update.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(Map.of("category", "bulk-test")))
             .update(
                 Property.ofValue(
