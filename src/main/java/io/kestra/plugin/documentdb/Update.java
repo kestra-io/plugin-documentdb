@@ -42,11 +42,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: update_user
                     type: io.kestra.plugin.documentdb.Update
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "{{ secret('DOCUMENTDB_CONNECTION_STRING') }}"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     filter:
                       email: "john.doe@example.com"
                     update:
@@ -66,11 +64,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: update_inactive_users
                     type: io.kestra.plugin.documentdb.Update
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "{{ secret('DOCUMENTDB_CONNECTION_STRING') }}"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     filter:
                       last_login:
                         $lt: "2023-01-01"
@@ -91,11 +87,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: increment_views
                     type: io.kestra.plugin.documentdb.Update
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "{{ secret('DOCUMENTDB_CONNECTION_STRING') }}"
                     database: "myapp"
                     collection: "profiles"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     filter:
                       user_id: "{{ inputs.user_id }}"
                     update:
@@ -139,11 +133,10 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
         Logger logger = runContext.logger();
 
         // Render properties
-        String rHost = runContext.render(this.host).as(String.class).orElseThrow();
+        String rConnectionString = runContext.render(this.connectionString).as(String.class).orElseThrow();
+        String rCaCertificate = this.caCertificate == null ? null : runContext.render(this.caCertificate).as(String.class).orElse(null);
         String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
         String rCollection = runContext.render(this.collection).as(String.class).orElseThrow();
-        String rUsername = runContext.render(this.username).as(String.class).orElseThrow();
-        String rPassword = runContext.render(this.password).as(String.class).orElseThrow();
         Map<String, Object> rFilter = runContext.render(this.filter).asMap(String.class, Object.class);
         Map<String, Object> rUpdate = runContext.render(this.update).asMap(String.class, Object.class);
         Boolean rUpdateMany = runContext.render(this.updateMany).as(Boolean.class).orElse(false);
@@ -153,38 +146,38 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
             throw new IllegalArgumentException("Update operations must be provided");
         }
 
-        DocumentDBClient client = new DocumentDBClient(rHost, rUsername, rPassword, runContext);
+        try (DocumentDBClient client = new DocumentDBClient(rConnectionString, rCaCertificate)) {
+            if (rUpdateMany) {
+                // Update multiple documents
+                logger.info("Updating multiple documents in DocumentDB database: {} collection: {}", rDatabase, rCollection);
 
-        if (rUpdateMany) {
-            // Update multiple documents
-            logger.info("Updating multiple documents in DocumentDB database: {} collection: {}", rDatabase, rCollection);
+                UpdateResult result = client.updateMany(rDatabase, rCollection, rFilter, rUpdate);
 
-            UpdateResult result = client.updateMany(rDatabase, rCollection, rFilter, rUpdate);
-
-            logger.info("Successfully updated {} of {} matching documents", result.getModifiedCount(), result.getMatchedCount());
-
-            return Output.builder()
-                .matchedCount(result.getMatchedCount())
-                .modifiedCount(result.getModifiedCount())
-                .upsertedId(result.getUpsertedId())
-                .build();
-        } else {
-            // Update single document
-            logger.info("Updating single document in DocumentDB database: {} collection: {}", rDatabase, rCollection);
-
-            UpdateResult result = client.updateOne(rDatabase, rCollection, rFilter, rUpdate);
-
-            if (result.getModifiedCount() > 0) {
                 logger.info("Successfully updated {} of {} matching documents", result.getModifiedCount(), result.getMatchedCount());
-            } else {
-                logger.info("No documents were modified (matched: {})", result.getMatchedCount());
-            }
 
-            return Output.builder()
-                .matchedCount(result.getMatchedCount())
-                .modifiedCount(result.getModifiedCount())
-                .upsertedId(result.getUpsertedId())
-                .build();
+                return Output.builder()
+                    .matchedCount(result.getMatchedCount())
+                    .modifiedCount(result.getModifiedCount())
+                    .upsertedId(result.getUpsertedId())
+                    .build();
+            } else {
+                // Update single document
+                logger.info("Updating single document in DocumentDB database: {} collection: {}", rDatabase, rCollection);
+
+                UpdateResult result = client.updateOne(rDatabase, rCollection, rFilter, rUpdate);
+
+                if (result.getModifiedCount() > 0) {
+                    logger.info("Successfully updated {} of {} matching documents", result.getModifiedCount(), result.getMatchedCount());
+                } else {
+                    logger.info("No documents were modified (matched: {})", result.getMatchedCount());
+                }
+
+                return Output.builder()
+                    .matchedCount(result.getMatchedCount())
+                    .modifiedCount(result.getModifiedCount())
+                    .upsertedId(result.getUpsertedId())
+                    .build();
+            }
         }
     }
 

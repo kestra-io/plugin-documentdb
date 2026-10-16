@@ -22,7 +22,6 @@ Single-module plugin. Source packages under `io.kestra.plugin`:
 Infrastructure dependencies (Docker Compose services):
 
 - `default`
-- `documentdb-api`
 - `mongodb`
 - `mongodb-data`
 

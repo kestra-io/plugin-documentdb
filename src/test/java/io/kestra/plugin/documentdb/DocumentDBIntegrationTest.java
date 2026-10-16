@@ -41,12 +41,9 @@ class DocumentDBIntegrationTest {
     @Inject
     RunContextFactory runContextFactory;
 
-    // Real connection details for local DocumentDB container
-    private static final String HOST = "http://localhost:10260";
+    private static final String CONNECTION_STRING = "mongodb://testuser:testpass@localhost:27017/test_db?authSource=admin";
     private static final String DATABASE = "test_db";
     private static final String COLLECTION = "integration_test";
-    private static final String USERNAME = "testuser";
-    private static final String PASSWORD = "testpass";
 
     @BeforeAll
     void setupTestData() throws Exception {
@@ -54,11 +51,9 @@ class DocumentDBIntegrationTest {
         Insert insertTask = Insert.builder()
             .id("setup-test-data")
             .type(Insert.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .documents(
                 Property.ofValue(
                     List.of(
@@ -81,11 +76,9 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("fetch-one-real-test")
             .type(Read.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(Map.of("category", "A")))
             .fetchType(Property.ofValue(FetchType.FETCH_ONE))
             .build();
@@ -105,11 +98,9 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("limit-skip-real-test")
             .type(Read.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(Map.of())) // Empty filter to get all documents
             .limit(Property.ofValue(2))
             .skip(Property.ofValue(1))
@@ -131,11 +122,9 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("aggregation-real-test")
             .type(Read.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(CONNECTION_STRING))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .aggregationPipeline(
                 Property.ofValue(
                     List.of(
