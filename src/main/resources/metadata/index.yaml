@@ -1,8 +1,8 @@
 group: io.kestra.plugin.documentdb
 name: "documentdb"
 title: "DocumentDB"
-description: "Tasks that manage DocumentDB collections with MongoDB-compatible insert, query, update, and delete operations."
-body: "Connect to DocumentDB's HTTP API to insert, read, update, and delete collection data. Provide `host`, `database`, `collection`, `username`, and `password`; Insert handles one document or up to 10 via `documents`, Read supports filters or aggregation pipelines with `fetchType` output handling, and Update/Delete apply MongoDB-style filters with `updateMany`/`deleteMany` switches to control scope."
+description: "Tasks that manage Amazon DocumentDB collections using the MongoDB Java Driver."
+body: "Connect to Amazon DocumentDB with `connectionString` and `database`; store the connection URI in a Kestra secret. Configure optional `caCertificate` with PEM content for TLS. Enable `tls=true`; Amazon DocumentDB engine versions earlier than 8.0.2 require `retryWrites=false`. The deprecated `host`, `username`, and `password` fields are retained in task configuration, but legacy HTTPS API host values and HTTP Basic-auth credentials are not used by the MongoDB Java Driver. Migrate those workflows to `connectionString`; the old HTTP transport is not included. The deprecated `collection` property remains required and compatible. Insert handles one document or up to 10 via `documents` or `from` (including supported Kestra URIs), Read supports filters or aggregation pipelines with `fetchType` output handling, and Update/Delete apply MongoDB-compatible filters with `updateMany`/`deleteMany` switches to control scope."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

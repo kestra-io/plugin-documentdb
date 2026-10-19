@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
@@ -19,7 +20,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -133,10 +133,10 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
         Logger logger = runContext.logger();
 
         // Render properties
-        String rConnectionString = runContext.render(this.connectionString).as(String.class).orElseThrow();
+        String rConnectionString = resolveConnectionString(runContext);
         String rCaCertificate = this.caCertificate == null ? null : runContext.render(this.caCertificate).as(String.class).orElse(null);
         String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
-        String rCollection = runContext.render(this.collection).as(String.class).orElseThrow();
+        String rCollection = renderCollection(runContext);
         Map<String, Object> rFilter = runContext.render(this.filter).asMap(String.class, Object.class);
         Map<String, Object> rUpdate = runContext.render(this.update).asMap(String.class, Object.class);
         Boolean rUpdateMany = runContext.render(this.updateMany).as(Boolean.class).orElse(false);
@@ -146,7 +146,7 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
             throw new IllegalArgumentException("Update operations must be provided");
         }
 
-        try (DocumentDBClient client = new DocumentDBClient(rConnectionString, rCaCertificate)) {
+        return withClient(rConnectionString, rCaCertificate, client -> {
             if (rUpdateMany) {
                 // Update multiple documents
                 logger.info("Updating multiple documents in DocumentDB database: {} collection: {}", rDatabase, rCollection);
@@ -178,7 +178,7 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
                     .upsertedId(result.getUpsertedId())
                     .build();
             }
-        }
+        });
     }
 
     @Builder

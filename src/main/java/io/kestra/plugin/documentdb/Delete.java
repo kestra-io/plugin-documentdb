@@ -113,14 +113,14 @@ public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delet
         Logger logger = runContext.logger();
 
         // Render properties
-        String rConnectionString = runContext.render(this.connectionString).as(String.class).orElseThrow();
+        String rConnectionString = resolveConnectionString(runContext);
         String rCaCertificate = this.caCertificate == null ? null : runContext.render(this.caCertificate).as(String.class).orElse(null);
         String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
-        String rCollection = runContext.render(this.collection).as(String.class).orElseThrow();
+        String rCollection = renderCollection(runContext);
         Map<String, Object> rFilter = runContext.render(this.filter).asMap(String.class, Object.class);
         Boolean rDeleteMany = runContext.render(this.deleteMany).as(Boolean.class).orElse(false);
 
-        try (DocumentDBClient client = new DocumentDBClient(rConnectionString, rCaCertificate)) {
+        return withClient(rConnectionString, rCaCertificate, client -> {
             if (rDeleteMany) {
                 // Delete multiple documents
                 logger.info("Deleting multiple documents from DocumentDB database: {} collection: {}", rDatabase, rCollection);
@@ -148,7 +148,7 @@ public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delet
                     .deletedCount(result.getDeletedCount())
                     .build();
             }
-        }
+        });
     }
 
     @Builder

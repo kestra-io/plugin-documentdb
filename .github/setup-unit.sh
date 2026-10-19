@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Setup script for Kestra DocumentDB Plugin Unit Tests
-# This script sets up a local DocumentDB instance for testing both locally and in CI
+# This script starts the MongoDB test service locally and in CI
 
 set -e
 
-echo "🐳 Setting up DocumentDB for unit tests..."
+echo "🐳 Setting up MongoDB for DocumentDB plugin tests..."
 
 # Check if Docker and Docker Compose are available
 if ! command -v docker &> /dev/null; then
@@ -14,36 +14,34 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # Check for Docker Compose (both v1 and v2)
-if ! command -v docker-compose &> /dev/null && ! command -v docker compose &> /dev/null; then
+if docker compose version &> /dev/null; then
+    DC_CMD="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    DC_CMD="docker-compose"
+else
     echo "❌ Docker Compose is not installed or not in PATH"
     exit 1
 fi
 
 # Use docker compose (v2) if available, otherwise fall back to docker-compose (v1)
-if command -v docker compose &> /dev/null; then
-    DC_CMD="docker compose"
-    COMPOSE_FILE="docker-compose-ci.yml"
-else
-    DC_CMD="docker-compose"
-    COMPOSE_FILE="docker-compose-ci.yml"
-fi
-
-# Stop and remove any existing containers
-echo "🧹 Cleaning up existing containers..."
-$DC_CMD -f $COMPOSE_FILE down -v --remove-orphans || true
+COMPOSE_FILE="docker-compose-ci.yml"
 
 # Start MongoDB container
 echo "🚀 Starting MongoDB container..."
-$DC_CMD -f $COMPOSE_FILE up -d --build
+$DC_CMD -f "$COMPOSE_FILE" up -d --build
 
 # Wait for containers to start
 echo "⏳ Waiting for containers to start..."
 timeout=120
 elapsed=0
-while ! $DC_CMD -f $COMPOSE_FILE ps | grep -q "mongodb.*Up"; do
+while ! $DC_CMD -f "$COMPOSE_FILE" exec -T mongodb mongosh --quiet \
+    --username testuser \
+    --password testpass \
+    --authenticationDatabase admin \
+    --eval 'db.adminCommand("ping").ok' 2>/dev/null | grep -q '^1$'; do
     if [ $elapsed -ge $timeout ]; then
         echo "❌ MongoDB container failed to start within ${timeout} seconds"
-        $DC_CMD -f $COMPOSE_FILE logs mongodb
+        $DC_CMD -f "$COMPOSE_FILE" logs mongodb
         exit 1
     fi
     sleep 5
@@ -55,12 +53,12 @@ echo "✅ MongoDB container is running"
 
 # Show status
 echo "📊 Container status:"
-$DC_CMD -f $COMPOSE_FILE ps
+$DC_CMD -f "$COMPOSE_FILE" ps
 
 echo ""
 echo "🎉 Setup complete!"
 echo ""
-echo "📋 MongoDB connection details:"
+echo "📋 MongoDB test connection details:"
 echo "  Host: localhost"
 echo "  Port: 27017"
 echo "  Username: testuser"

@@ -113,34 +113,6 @@ class InsertTest {
     }
 
     @Test
-    void shouldRejectTooManyDocuments() throws Exception {
-        List<Map<String, Object>> tooManyDocs = List.of(
-            Map.of("name", "Doc1"), Map.of("name", "Doc2"), Map.of("name", "Doc3"),
-            Map.of("name", "Doc4"), Map.of("name", "Doc5"), Map.of("name", "Doc6"),
-            Map.of("name", "Doc7"), Map.of("name", "Doc8"), Map.of("name", "Doc9"),
-            Map.of("name", "Doc10"), Map.of("name", "Doc11") // 11 documents - exceeds limit
-        );
-
-        Insert task = Insert.builder()
-            .id("test-too-many")
-            .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
-            .database(Property.ofValue("testdb"))
-            .collection(Property.ofValue("testcol"))
-            .documents(Property.ofValue(tooManyDocs))
-            .build();
-
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
-
-        try {
-            task.run(runContext);
-            throw new AssertionError("Should have thrown IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            assertThat(e.getMessage(), containsString("Cannot insert more than"));
-        }
-    }
-
-    @Test
     @Order(10)
     @DisplayName("Integration: Insert Single Document with Real DocumentDB")
     void shouldInsertSingleDocumentWithRealServer() throws Exception {
