@@ -147,10 +147,10 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
     public Output run(RunContext runContext) throws Exception {
         Logger logger = runContext.logger();
 
-        // Render properties
         String rConnectionString = resolveConnectionString(runContext);
         String rCaCertificate = this.caCertificate == null ? null : runContext.render(this.caCertificate).as(String.class).orElse(null);
-        String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
+        String rDatabase = runContext.render(this.database).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Unable to render the DocumentDB database name."));
         String rCollection = renderCollection(runContext);
         Map<String, Object> rDocument = runContext.render(this.document).asMap(String.class, Object.class);
         Object rFrom = this.from == null ? null : runContext.render(Property.ofValue(this.from)).as(Object.class).orElse(null);
@@ -181,7 +181,6 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
         return withClient(rConnectionString, rCaCertificate, client ->
         {
             if (hasDocument) {
-                // Insert single document
                 logger.info("Inserting single document into DocumentDB database: {} collection: {}", rDatabase, rCollection);
 
                 InsertResult result = client.insertOne(rDatabase, rCollection, rDocument);

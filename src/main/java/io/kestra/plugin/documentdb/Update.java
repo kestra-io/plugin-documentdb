@@ -137,10 +137,10 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
     public Output run(RunContext runContext) throws Exception {
         Logger logger = runContext.logger();
 
-        // Render properties
         String rConnectionString = resolveConnectionString(runContext);
         String rCaCertificate = this.caCertificate == null ? null : runContext.render(this.caCertificate).as(String.class).orElse(null);
-        String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
+        String rDatabase = runContext.render(this.database).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Unable to render the DocumentDB database name."));
         String rCollection = renderCollection(runContext);
         Map<String, Object> rFilter = runContext.render(this.filter).asMap(String.class, Object.class);
         Map<String, Object> rUpdate = runContext.render(this.update).asMap(String.class, Object.class);

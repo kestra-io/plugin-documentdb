@@ -183,7 +183,8 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
 
     Output run(RunContext runContext, DocumentDBClient client) throws Exception {
         Logger logger = runContext.logger();
-        String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
+        String rDatabase = runContext.render(this.database).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Unable to render the DocumentDB database name."));
         String rCollection = renderCollection(runContext);
         Map<String, Object> rFilter = runContext.render(this.filter).asMap(String.class, Object.class);
         List<Map<String, Object>> rAggregationPipeline = runContext.render(this.aggregationPipeline).asList(Map.class);
@@ -278,10 +279,7 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
         return map;
     }
 
-    /**
-     * Store records as an ION file in Kestra's internal storage.
-     * Returns a StoredResult containing both the URI and record count.
-     */
+    // Store records as an ION file in Kestra's internal storage.
     private StoredResult storeRecordsAsFile(
         RunContext runContext,
         MongoCursor<Document> cursor,
@@ -306,7 +304,11 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
                     }
                 });
 
-                count = FileSerde.writeAll(outputStream, recordFlux).blockOptional().orElseThrow();
+                    count = FileSerde.writeAll(outputStream, recordFlux)
+                        .blockOptional()
+                        .orElseThrow(() -> new IllegalStateException(
+                        "Failed to determine the number of records written to the ION file."
+                    ));
             }
         } catch (IOException e) {
             throw new IOException("Failed to store records as Ion file: " + e.getMessage(), e);
@@ -315,10 +317,6 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
         URI storedFileUri = runContext.storage().putFile(tempFile);
         return new StoredResult(storedFileUri, count);
     }
-
-    /**
-     * Helper class to return both URI and count for STORE operations.
-     */
     private static class StoredResult {
         private final URI uri;
         private final long count;

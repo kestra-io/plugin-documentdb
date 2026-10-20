@@ -112,11 +112,10 @@ public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delet
     @Override
     public Output run(RunContext runContext) throws Exception {
         Logger logger = runContext.logger();
-
-        // Render properties
         String rConnectionString = resolveConnectionString(runContext);
         String rCaCertificate = this.caCertificate == null ? null : runContext.render(this.caCertificate).as(String.class).orElse(null);
-        String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
+        String rDatabase = runContext.render(this.database).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Unable to render the DocumentDB database name."));
         String rCollection = renderCollection(runContext);
         Map<String, Object> rFilter = runContext.render(this.filter).asMap(String.class, Object.class);
         Boolean rDeleteMany = runContext.render(this.deleteMany).as(Boolean.class).orElse(false);
