@@ -1,17 +1,20 @@
 package io.kestra.plugin.documentdb;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
@@ -31,7 +34,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.SignalType;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -68,6 +71,28 @@ class InsertBatchTest {
         ArgumentCaptor<List<Map<String, Object>>> batches = ArgumentCaptor.forClass(List.class);
         verify(client).insertMany(anyString(), anyString(), batches.capture());
         assertEquals(List.of(10), batches.getAllValues().stream().map(List::size).toList());
+        verify(client).close();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldInsertMoreThanTenFromInBatchesAndAggregateResultsInOrder() throws Exception {
+        List<Map<String, Object>> input = documents(205);
+        DocumentDBClient client = mockClientFor();
+        Insert task = task(client, input);
+
+        Insert.Output output = task.run(context(task));
+
+        assertEquals(205, output.getInsertedCount());
+        assertEquals(205, output.getInsertedIds().size());
+        assertEquals("id-0", output.getInsertedId());
+        assertEquals(
+            input.stream().map(row -> (String) row.get("_id")).toList(),
+            output.getInsertedIds()
+        );
+        ArgumentCaptor<List<Map<String, Object>>> batches = ArgumentCaptor.forClass(List.class);
+        verify(client, org.mockito.Mockito.times(3)).insertMany(anyString(), anyString(), batches.capture());
+        assertEquals(List.of(100, 100, 5), batches.getAllValues().stream().map(List::size).toList());
         verify(client).close();
     }
 
@@ -117,23 +142,8 @@ class InsertBatchTest {
     }
 
     @Test
-    void shouldRejectElevenFromDocumentsBeforeCreatingClientOrWriting() throws Exception {
-        DocumentDBClient client = mock(DocumentDBClient.class);
-        Insert task = task(client, documents(11));
-
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> task.run(context(task))
-        );
-
-        assertTrue(exception.getMessage().contains("Cannot insert more than 10"));
-        verify(client, never()).insertMany(anyString(), anyString(), anyList());
-        verify(client, never()).close();
-    }
-
-    @Test
     void shouldReadDocumentsFromKestraStorageUri() throws Exception {
-        List<Map<String, Object>> input = documents(3);
+        List<Map<String, Object>> input = documents(12);
         DocumentDBClient client = mockClientFor();
         Path tempFile = Files.createTempFile("documentdb-input", ".ion");
         try {
@@ -146,35 +156,11 @@ class InsertBatchTest {
 
             Insert.Output output = task.run(context(task));
 
-            assertEquals(3, output.getInsertedCount());
-            assertEquals(3, output.getInsertedIds().size());
-            verify(client).insertMany(anyString(), anyString(), anyList());
-            verify(client).close();
-        } finally {
-            Files.deleteIfExists(tempFile);
-        }
-    }
-
-    @Test
-    void shouldRejectElevenDocumentsFromKestraStorageUriBeforeWriting() throws Exception {
-        DocumentDBClient client = mock(DocumentDBClient.class);
-        List<Map<String, Object>> input = documents(11);
-        Insert seedTask = task(client, List.of());
-        Path tempFile = Files.createTempFile("documentdb-oversized-input", ".ion");
-        try {
-            try (OutputStream outputStream = Files.newOutputStream(tempFile)) {
-                FileSerde.writeAll(outputStream, Flux.fromIterable(input)).block();
-            }
-            String inputUri = context(seedTask).storage().putFile(tempFile.toFile()).toString();
-            Insert task = task(client, inputUri);
-
-            IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> task.run(context(task))
-            );
-
-            assertTrue(exception.getMessage().contains("Cannot insert more than 10"));
-            verify(client, never()).insertMany(anyString(), anyString(), anyList());
+            assertEquals(12, output.getInsertedCount());
+            assertEquals(input.stream().map(row -> (String) row.get("_id")).toList(), output.getInsertedIds());
+            ArgumentCaptor<List<Map<String, Object>>> batches = ArgumentCaptor.forClass(List.class);
+            verify(client).insertMany(anyString(), anyString(), batches.capture());
+            assertEquals(List.of(12), batches.getAllValues().stream().map(List::size).toList());
             verify(client).close();
         } finally {
             Files.deleteIfExists(tempFile);
@@ -251,11 +237,19 @@ class InsertBatchTest {
     }
 
     @Test
-    void shouldPropagateInsertFailureWithoutPartialOutputAndCloseClient() throws Exception {
+    void shouldPropagateLaterBatchFailureWithoutPartialOutputAndCloseClient() throws Exception {
         DocumentDBException failure = new DocumentDBException("insert failed");
-        DocumentDBClient client = mock(DocumentDBClient.class);
-        when(client.insertMany(anyString(), anyString(), anyList())).thenThrow(failure);
-        Insert task = task(client, documents(10));
+        AtomicInteger calls = new AtomicInteger();
+        DocumentDBClient client = mockClientFor();
+        when(client.insertMany(anyString(), anyString(), anyList()))
+            .thenAnswer(invocation ->
+            {
+                if (calls.incrementAndGet() == 2) {
+                    throw failure;
+                }
+                return resultFor(invocation.getArgument(2));
+            });
+        Insert task = task(client, documents(205));
 
         DocumentDBException thrown = assertThrows(
             DocumentDBException.class,
@@ -263,7 +257,7 @@ class InsertBatchTest {
         );
 
         assertSame(failure, thrown);
-        verify(client).insertMany(anyString(), anyString(), anyList());
+        verify(client, org.mockito.Mockito.times(2)).insertMany(anyString(), anyString(), anyList());
         verify(client).close();
     }
 
@@ -328,58 +322,82 @@ class InsertBatchTest {
     }
 
     @Test
-    void shouldCancelOverLimitInputWithoutAttemptingAnInsert() throws Exception {
+    void shouldReleaseStreamAfterSuccessfulInsertion() throws Exception {
+        AtomicInteger resourceCloseCount = new AtomicInteger();
         AtomicReference<SignalType> cleanupSignal = new AtomicReference<>();
+        Flux<Map<String, Object>> records = Flux.using(
+            () -> resourceCloseCount,
+            ignored -> Flux.fromIterable(documents(2)).doFinally(cleanupSignal::set),
+            ignored -> resourceCloseCount.incrementAndGet()
+        );
+        DocumentDBClient client = mockClientFor();
+        Insert task = task(client, List.of());
+
+        Insert.Output output = task.insertDocuments(records, client, DATABASE, COLLECTION);
+
+        assertEquals(2, output.getInsertedCount());
+        assertEquals(1, resourceCloseCount.get());
+        assertEquals(SignalType.ON_COMPLETE, cleanupSignal.get());
+    }
+
+    @Test
+    void shouldCancelAndCloseStreamWhenTaskIsKilledDuringBatchInsert() throws Exception {
+        CountDownLatch insertStarted = new CountDownLatch(1);
+        CountDownLatch finishInsert = new CountDownLatch(1);
+        AtomicReference<SignalType> cleanupSignal = new AtomicReference<>();
+        DocumentDBClient client = mock(DocumentDBClient.class);
+        Insert task = task(client, List.of());
+        when(client.insertMany(anyString(), anyString(), anyList())).thenAnswer(invocation ->
+        {
+            insertStarted.countDown();
+            finishInsert.await();
+            return resultFor(invocation.getArgument(2));
+        });
         Flux<Map<String, Object>> records = Flux.range(0, Integer.MAX_VALUE)
             .map(index -> Map.<String, Object> of("_id", "id-" + index))
             .doFinally(cleanupSignal::set);
-        DocumentDBClient client = mock(DocumentDBClient.class);
-        Insert task = task(client, List.of());
+        ExecutorService executor = Executors.newSingleThreadExecutor();
 
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> task.insertDocuments(records, client, DATABASE, COLLECTION)
-        );
+        try {
+            Future<Insert.Output> insertion = executor.submit(() -> task.insertDocuments(records, client, DATABASE, COLLECTION));
+            assertTrue(insertStarted.await(5, TimeUnit.SECONDS));
+            task.kill();
+            finishInsert.countDown();
 
-        assertTrue(exception.getMessage().contains("Cannot insert more than 10"));
-        assertEquals(SignalType.CANCEL, cleanupSignal.get());
-        verify(client, never()).insertMany(anyString(), anyString(), anyList());
+            ExecutionException exception = assertThrows(
+                ExecutionException.class,
+                () -> insertion.get(5, TimeUnit.SECONDS)
+            );
+            assertInstanceOf(CancellationException.class, exception.getCause());
+            assertEquals(SignalType.CANCEL, cleanupSignal.get());
+            verify(client).insertMany(anyString(), anyString(), anyList());
+        } finally {
+            finishInsert.countDown();
+            task.kill();
+            executor.shutdownNow();
+        }
     }
 
     @Test
-    void shouldBoundUriReadAndCloseSourceWhenInputExceedsLimit() throws Exception {
-        RepeatingIonInputStream input = new RepeatingIonInputStream(100_000);
-        AtomicInteger parsedRecords = new AtomicInteger();
-        Flux<Map<String, Object>> records = Insert.readIonRecords(() -> input)
-            .doOnNext(ignored -> parsedRecords.incrementAndGet());
+    void shouldNotReturnPartialOutputWhenKilledAfterFiniteInputCompletes() throws Exception {
+        AtomicReference<SignalType> cleanupSignal = new AtomicReference<>();
         DocumentDBClient client = mock(DocumentDBClient.class);
         Insert task = task(client, List.of());
+        when(client.insertMany(anyString(), anyString(), anyList())).thenAnswer(invocation ->
+        {
+            task.kill();
+            return resultFor(invocation.getArgument(2));
+        });
+        Flux<Map<String, Object>> records = Flux.fromIterable(documents(100))
+            .doFinally(cleanupSignal::set);
 
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
+        assertThrows(
+            CancellationException.class,
             () -> task.insertDocuments(records, client, DATABASE, COLLECTION)
         );
 
-        assertTrue(exception.getMessage().contains("Cannot insert more than 10"));
-        assertTrue(parsedRecords.get() <= 11, "URI parser should stop after one record beyond the maximum");
-        assertTrue(input.bytesRead() < input.totalBytes() / 2, "URI reader should stop before consuming the complete source");
-        assertEquals(1, input.closeCount());
-        verify(client, never()).insertMany(anyString(), anyString(), anyList());
-    }
-
-    @Test
-    void shouldCloseIonSourceOnNormalCompletionAndParsingFailure() {
-        RepeatingIonInputStream completeInput = new RepeatingIonInputStream(3);
-
-        List<Map<String, Object>> output = Insert.readIonRecords(() -> completeInput).collectList().block();
-
-        assertNotNull(output);
-        assertEquals(3, output.size());
-        assertEquals(1, completeInput.closeCount());
-
-        CloseTrackingByteArrayInputStream invalidInput = new CloseTrackingByteArrayInputStream("not valid Ion".getBytes(StandardCharsets.UTF_8));
-        assertThrows(RuntimeException.class, () -> Insert.readIonRecords(() -> invalidInput).collectList().block());
-        assertEquals(1, invalidInput.closeCount());
+        assertEquals(SignalType.ON_COMPLETE, cleanupSignal.get());
+        verify(client).insertMany(anyString(), anyString(), anyList());
     }
 
     @Test
@@ -470,82 +488,4 @@ class InsertBatchTest {
         return documents;
     }
 
-    private static final class RepeatingIonInputStream extends InputStream {
-        private static final byte[] RECORD = "{\"_id\":\"id\",\"value\":1}\n".getBytes(StandardCharsets.UTF_8);
-
-        private final long totalRecords;
-        private final AtomicLong bytesRead = new AtomicLong();
-        private final AtomicInteger closeCount = new AtomicInteger();
-        private long remainingRecords;
-        private int recordOffset;
-
-        private RepeatingIonInputStream(long totalRecords) {
-            this.totalRecords = totalRecords;
-            this.remainingRecords = totalRecords;
-        }
-
-        @Override
-        public int read() {
-            byte[] next = new byte[1];
-            return read(next, 0, 1) == -1 ? -1 : next[0] & 0xff;
-        }
-
-        @Override
-        public int read(byte[] target, int offset, int length) {
-            if (length == 0) {
-                return 0;
-            }
-            if (remainingRecords == 0) {
-                return -1;
-            }
-
-            int written = 0;
-            while (written < length && remainingRecords > 0) {
-                int amount = Math.min(length - written, RECORD.length - recordOffset);
-                System.arraycopy(RECORD, recordOffset, target, offset + written, amount);
-                written += amount;
-                recordOffset += amount;
-                if (recordOffset == RECORD.length) {
-                    recordOffset = 0;
-                    remainingRecords--;
-                }
-            }
-            bytesRead.addAndGet(written);
-            return written;
-        }
-
-        @Override
-        public void close() {
-            closeCount.incrementAndGet();
-        }
-
-        private long bytesRead() {
-            return bytesRead.get();
-        }
-
-        private long totalBytes() {
-            return totalRecords * RECORD.length;
-        }
-
-        private int closeCount() {
-            return closeCount.get();
-        }
-    }
-
-    private static final class CloseTrackingByteArrayInputStream extends ByteArrayInputStream {
-        private final AtomicInteger closeCount = new AtomicInteger();
-
-        private CloseTrackingByteArrayInputStream(byte[] bytes) {
-            super(bytes);
-        }
-
-        @Override
-        public void close() {
-            closeCount.incrementAndGet();
-        }
-
-        private int closeCount() {
-            return closeCount.get();
-        }
-    }
 }

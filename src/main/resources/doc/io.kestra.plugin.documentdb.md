@@ -31,7 +31,7 @@ For Amazon DocumentDB engine versions earlier than 8.0.2, set `retryWrites=false
 - `from`: structured data provided as a map, a list of maps, a JSON string, or a Kestra-supported URI (`kestra://`, `file://`, or `nsfile://`).
 - `documents`: the legacy inline list-of-maps input.
 
-`document` inserts one document. Batch input through `from` or `documents` is limited to 10 documents and is sent in one insert request; oversized inputs are rejected before any database write. URI sources are parsed incrementally as Ion and read only far enough to detect an input over the limit. Outputs contain `insertedId` (the first returned ID, or `null` when none), `insertedIds` (all acknowledged IDs), and `insertedCount` (the acknowledged count). Insert failures propagate without partial-success task output.
+`document` inserts one document. Input through `from` is streamed and inserted in batches of up to 100 documents, including Kestra-supported URIs. The legacy `documents` property remains limited to 10 documents. Outputs contain `insertedId` (the first returned ID, or `null` when none), `insertedIds` (all acknowledged IDs in input order), and `insertedCount` (the acknowledged count). If a batch fails, earlier batches or earlier operations within that batch may already have been written; the task fails without returning partial-success output.
 
 ### Update
 

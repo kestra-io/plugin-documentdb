@@ -1,8 +1,5 @@
 package io.kestra.plugin.documentdb;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -10,9 +7,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
@@ -158,88 +152,6 @@ class DocumentDBTaskCancellationTest {
         verify(cursor).close();
     }
 
-    @Test
-    void shouldCancelUriSubscriptionAndCloseReaderWhenKilledDuringRead() throws Exception {
-        Insert.InputResource inputResource = new Insert.InputResource();
-        TestDocumentDBTask task = new TestDocumentDBTask(mock(DocumentDBClient.class));
-        task.track(inputResource);
-        BlockingInputStream inputStream = new BlockingInputStream();
-        AtomicReference<Boolean> cancelled = new AtomicReference<>(false);
-        var records = Insert.readIonRecords(() -> inputStream, inputResource)
-            .doOnCancel(() -> cancelled.set(true));
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-
-        try {
-            Future<?> consuming = executor.submit(() ->
-            {
-                try {
-                    Stream<Map<String, Object>> stream = records.toStream(1);
-                    inputResource.registerStream(stream);
-                    stream.findFirst();
-                } catch (CancellationException expected) {
-                    // Cancellation while establishing the stream is expected.
-                }
-            });
-
-            assertTrue(inputStream.readStarted.await(5, TimeUnit.SECONDS));
-            task.kill();
-            task.kill();
-
-            consuming.get(5, TimeUnit.SECONDS);
-            assertTrue(cancelled.get());
-            assertEquals(1, inputStream.closeCount.get());
-        } finally {
-            task.kill();
-            executor.shutdownNow();
-        }
-    }
-
-    @Test
-    void shouldCloseReaderCreatedAfterCancellationAndKeepRepeatedKillIdempotent() throws Exception {
-        Insert.InputResource inputResource = new Insert.InputResource();
-        TestDocumentDBTask task = new TestDocumentDBTask(mock(DocumentDBClient.class));
-        task.track(inputResource);
-        CountDownLatch openingReader = new CountDownLatch(1);
-        CountDownLatch finishOpening = new CountDownLatch(1);
-        BlockingInputStream inputStream = new BlockingInputStream();
-        var records = Insert.readIonRecords(() ->
-        {
-            openingReader.countDown();
-            try {
-                finishOpening.await();
-                return inputStream;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException(e);
-            }
-        }, inputResource);
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-
-        try {
-            Future<?> consuming = executor.submit(() ->
-            {
-                try (Stream<Map<String, Object>> stream = records.toStream(1)) {
-                    inputResource.registerStream(stream);
-                    stream.findFirst();
-                } catch (CancellationException expected) {
-                    // Cancellation during resource creation is expected.
-                }
-            });
-
-            assertTrue(openingReader.await(5, TimeUnit.SECONDS));
-            task.kill();
-            task.kill();
-            finishOpening.countDown();
-
-            consuming.get(5, TimeUnit.SECONDS);
-            assertEquals(1, inputStream.closeCount.get());
-        } finally {
-            finishOpening.countDown();
-            task.kill();
-            executor.shutdownNow();
-        }
-    }
-
     private static class TestDocumentDBTask extends AbstractDocumentDBTask {
         private final DocumentDBClient client;
         private final CountDownLatch creatingClient;
@@ -275,32 +187,5 @@ class DocumentDBTaskCancellationTest {
             return withCursor(cursor, operation);
         }
 
-        private void track(AutoCloseable resource) {
-            registerActiveResource(resource);
-        }
-    }
-
-    private static final class BlockingInputStream extends InputStream {
-        private final CountDownLatch readStarted = new CountDownLatch(1);
-        private final CountDownLatch closed = new CountDownLatch(1);
-        private final AtomicInteger closeCount = new AtomicInteger();
-
-        @Override
-        public int read() throws IOException {
-            readStarted.countDown();
-            try {
-                closed.await();
-                throw new IOException("Input stream closed while reading");
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException(e);
-            }
-        }
-
-        @Override
-        public void close() {
-            closeCount.incrementAndGet();
-            closed.countDown();
-        }
     }
 }

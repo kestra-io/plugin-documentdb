@@ -1,37 +1,22 @@
 package io.kestra.plugin.documentdb;
 
-import java.io.BufferedInputStream;
-import java.io.FilterInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
-
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.MappingIterator;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Data;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.models.property.URIFetcher;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.FileSerde;
-import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.documentdb.models.InsertResult;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -134,8 +119,7 @@ import reactor.core.publisher.Flux;
 )
 public class Insert extends AbstractDocumentDBTask implements RunnableTask<Insert.Output>, Data.From {
     private static final int MAX_DOCUMENTS_PER_INSERT = 10;
-    private static final TypeReference<Map<String, Object>> DOCUMENT_TYPE = new TypeReference<>() {
-    };
+    private static final int BATCH_SIZE = 100;
 
     @Schema(
         title = "Single document payload",
@@ -184,8 +168,14 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
         }
 
         Object source = hasFrom ? rFrom : rDocuments;
-        if (!hasDocument && source instanceof List<?> list && list.size() > MAX_DOCUMENTS_PER_INSERT) {
-            throw tooManyDocuments();
+        if (
+            hasDocuments
+                && rDocuments instanceof List<?> list
+                && list.size() > MAX_DOCUMENTS_PER_INSERT
+        ) {
+            throw new IllegalArgumentException(
+                "Cannot insert more than " + MAX_DOCUMENTS_PER_INSERT + " documents through the legacy 'documents' property"
+            );
         }
 
         return withClient(rConnectionString, rCaCertificate, client ->
@@ -206,88 +196,9 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
             }
 
             logger.info("Streaming document input into DocumentDB database: {} collection: {}", rDatabase, rCollection);
-            if (source instanceof String uri && URIFetcher.supports(uri)) {
-                InputResource inputResource = registerActiveResource(new InputResource());
-                try {
-                    Output output = insertDocuments(readUri(uri, runContext, inputResource), client, rDatabase, rCollection, inputResource);
-                    logger.info("Successfully inserted {} documents", output.getInsertedCount());
-                    return output;
-                } finally {
-                    releaseActiveResource(inputResource);
-                }
-            }
-
             Output output = insertDocuments(Data.from(source).read(runContext), client, rDatabase, rCollection);
             logger.info("Successfully inserted {} documents", output.getInsertedCount());
             return output;
-        });
-    }
-
-    private static Flux<Map<String, Object>> readUri(String uri, RunContext runContext, InputResource inputResource) {
-        return readIonRecords(() ->
-        {
-            try {
-                return URIFetcher.of(uri).fetch(runContext);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }, inputResource);
-    }
-
-    static Flux<Map<String, Object>> readIonRecords(Supplier<InputStream> inputStreamSupplier) {
-        return readIonRecords(inputStreamSupplier, null);
-    }
-
-    static Flux<Map<String, Object>> readIonRecords(Supplier<InputStream> inputStreamSupplier, InputResource inputResource) {
-        return Flux.using(
-            () ->
-            {
-                InputStream fetchedInputStream = inputStreamSupplier.get();
-                InputStream registeredReader = inputResource == null ? null : inputResource.registerReader(fetchedInputStream);
-                InputStream inputStream = new BufferedInputStream(
-                    registeredReader == null ? fetchedInputStream : registeredReader,
-                    FileSerde.BUFFER_SIZE
-                );
-                try {
-                    MappingIterator<Map<String, Object>> iterator = JacksonMapper.ofIon()
-                        .readerFor(DOCUMENT_TYPE)
-                        .without(JsonParser.Feature.AUTO_CLOSE_SOURCE)
-                        .readValues(inputStream);
-                    return new IonInput(inputStream, registeredReader, iterator);
-                } catch (IOException | RuntimeException e) {
-                    try {
-                        if (inputResource == null) {
-                            inputStream.close();
-                        } else {
-                            inputResource.closeReader(registeredReader);
-                        }
-                    } catch (IOException closeException) {
-                        e.addSuppressed(closeException);
-                    }
-                    if (e instanceof IOException ioException) {
-                        throw new UncheckedIOException(ioException);
-                    }
-                    throw e;
-                }
-            },
-            ionInput -> Flux.<Map<String, Object>> generate(sink ->
-            {
-                try {
-                    if (ionInput.iterator.hasNextValue()) {
-                        sink.next(ionInput.iterator.nextValue());
-                    } else {
-                        sink.complete();
-                    }
-                } catch (IOException e) {
-                    sink.error(e);
-                }
-            }),
-            ionInput -> ionInput.close(inputResource)
-        ).doOnSubscribe(subscription ->
-        {
-            if (inputResource != null) {
-                inputResource.registerSubscription(subscription);
-            }
         });
     }
 
@@ -296,52 +207,52 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
         DocumentDBClient client,
         String database,
         String collection) throws Exception {
-        try (InputResource inputResource = new InputResource()) {
-            return insertDocuments(records, client, database, collection, inputResource);
-        }
-    }
 
-    private Output insertDocuments(
-        Flux<Map<String, Object>> records,
-        DocumentDBClient client,
-        String database,
-        String collection,
-        InputResource inputResource) throws Exception {
-        List<Map<String, Object>> documents = new ArrayList<>(MAX_DOCUMENTS_PER_INSERT + 1);
-        try (Stream<Map<String, Object>> stream = records.take(MAX_DOCUMENTS_PER_INSERT + 1).toStream(1)) {
-            inputResource.registerStream(stream);
-            Iterator<Map<String, Object>> iterator = stream.iterator();
+        List<String> insertedIds = new ArrayList<>();
+        int insertedCount = 0;
+        AtomicBoolean cancelled = new AtomicBoolean();
+
+        Stream<List<Map<String, Object>>> batches = records
+            .doOnCancel(() -> cancelled.set(true))
+            .buffer(BATCH_SIZE)
+            .toStream(1);
+        registerActiveResource(batches);
+
+        try {
+            checkCancellation(cancelled);
+            Iterator<List<Map<String, Object>>> iterator = batches.iterator();
+
             while (iterator.hasNext()) {
-                documents.add(iterator.next());
+                checkCancellation(cancelled);
+
+                List<Map<String, Object>> batch = iterator.next();
+
+                InsertResult result = client.insertMany(
+                    database,
+                    collection,
+                    batch
+                );
+
+                checkCancellation(cancelled);
+
+                insertedIds.addAll(result.getInsertedIds());
+                insertedCount += result.getInsertedCount();
             }
+
+            checkCancellation(cancelled);
+        } finally {
+            releaseActiveResource(batches);
         }
 
-        if (documents.isEmpty()) {
-            throw new IllegalArgumentException("No document to insert: set one of 'document', 'from', or 'documents'");
-        }
-        if (documents.size() > MAX_DOCUMENTS_PER_INSERT) {
-            throw tooManyDocuments();
+        checkIfKilled();
+
+        if (insertedCount == 0) {
+            throw new IllegalArgumentException(
+                "No document to insert: set one of 'document', 'from', or 'documents'"
+            );
         }
 
-        InsertResult result = client.insertMany(database, collection, documents);
-        return output(result.getInsertedIds(), result.getInsertedCount());
-    }
-
-    private static IllegalArgumentException tooManyDocuments() {
-        return new IllegalArgumentException("Cannot insert more than " + MAX_DOCUMENTS_PER_INSERT + " documents at once");
-    }
-
-    private static boolean hasValue(Object value) {
-        if (value == null) {
-            return false;
-        }
-        if (value instanceof Map<?, ?> map) {
-            return !map.isEmpty();
-        }
-        if (value instanceof Iterable<?> iterable) {
-            return iterable.iterator().hasNext();
-        }
-        return !(value instanceof CharSequence text) || !text.toString().isBlank();
+        return output(insertedIds, insertedCount);
     }
 
     private static Output output(List<String> insertedIds, Integer insertedCount) {
@@ -352,172 +263,24 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
             .build();
     }
 
-    private static final class IonInput {
-        private final InputStream inputStream;
-        private final InputStream registeredReader;
-        private final MappingIterator<Map<String, Object>> iterator;
-
-        private IonInput(InputStream inputStream, InputStream registeredReader, MappingIterator<Map<String, Object>> iterator) {
-            this.inputStream = inputStream;
-            this.registeredReader = registeredReader;
-            this.iterator = iterator;
+    private void checkCancellation(AtomicBoolean cancelled) {
+        if (cancelled.get()) {
+            throw new CancellationException("DocumentDB insertion was cancelled");
         }
-
-        private void close(InputResource inputResource) {
-            RuntimeException failure = null;
-            try {
-                iterator.close();
-            } catch (IOException e) {
-                failure = new UncheckedIOException(e);
-            } catch (RuntimeException e) {
-                failure = e;
-            }
-
-            try {
-                if (inputResource == null) {
-                    inputStream.close();
-                } else {
-                    inputResource.closeReader(registeredReader);
-                }
-            } catch (IOException e) {
-                if (failure == null) {
-                    failure = new UncheckedIOException(e);
-                } else {
-                    failure.addSuppressed(e);
-                }
-            }
-
-            if (failure != null) {
-                throw failure;
-            }
-        }
+        checkIfKilled();
     }
 
-    static final class InputResource implements AutoCloseable {
-        private final AtomicBoolean closed = new AtomicBoolean();
-        private final AtomicReference<Stream<?>> stream = new AtomicReference<>();
-        private final AtomicReference<Subscription> subscription = new AtomicReference<>();
-        private final AtomicReference<CloseOnceInputStream> reader = new AtomicReference<>();
-
-        void registerStream(Stream<?> activeStream) {
-            if (closed.get() || !stream.compareAndSet(null, activeStream)) {
-                activeStream.close();
-                if (closed.get()) {
-                    throw new CancellationException("DocumentDB input was cancelled");
-                }
-                throw new IllegalStateException("A DocumentDB input stream is already active");
-            }
-
-            if (closed.get()) {
-                if (stream.compareAndSet(activeStream, null)) {
-                    activeStream.close();
-                }
-                throw new CancellationException("DocumentDB input was cancelled");
-            }
+    private static boolean hasValue(Object value) {
+        if (value == null) {
+            return false;
         }
-
-        void registerSubscription(Subscription activeSubscription) {
-            if (closed.get() || !subscription.compareAndSet(null, activeSubscription)) {
-                activeSubscription.cancel();
-                if (closed.get()) {
-                    return;
-                }
-                throw new IllegalStateException("A DocumentDB input subscription is already active");
-            }
-
-            if (closed.get() && subscription.compareAndSet(activeSubscription, null)) {
-                activeSubscription.cancel();
-            }
+        if (value instanceof CharSequence string) {
+            return !string.toString().isBlank();
         }
-
-        private InputStream registerReader(InputStream inputStream) throws IOException {
-            CloseOnceInputStream closeOnceInputStream = new CloseOnceInputStream(inputStream);
-            if (closed.get() || !reader.compareAndSet(null, closeOnceInputStream)) {
-                closeOnceInputStream.close();
-                if (closed.get()) {
-                    throw new CancellationException("DocumentDB input was cancelled");
-                }
-                throw new IllegalStateException("A DocumentDB input reader is already active");
-            }
-
-            if (closed.get()) {
-                if (reader.compareAndSet(closeOnceInputStream, null)) {
-                    closeOnceInputStream.close();
-                }
-                throw new CancellationException("DocumentDB input was cancelled");
-            }
-            return closeOnceInputStream;
+        if (value instanceof List<?> list) {
+            return !list.isEmpty();
         }
-
-        private void closeReader(InputStream inputStream) throws IOException {
-            if (inputStream == null) {
-                return;
-            }
-            if (inputStream instanceof CloseOnceInputStream closeOnceInputStream && reader.compareAndSet(closeOnceInputStream, null)) {
-                closeOnceInputStream.close();
-            } else if (!(inputStream instanceof CloseOnceInputStream)) {
-                inputStream.close();
-            }
-        }
-
-        @Override
-        public void close() {
-            if (!closed.compareAndSet(false, true)) {
-                return;
-            }
-
-            RuntimeException failure = null;
-            Stream<?> activeStream = stream.getAndSet(null);
-            if (activeStream != null) {
-                try {
-                    activeStream.close();
-                } catch (RuntimeException e) {
-                    failure = e;
-                }
-            } else {
-                Subscription activeSubscription = subscription.getAndSet(null);
-                if (activeSubscription != null) {
-                    try {
-                        activeSubscription.cancel();
-                    } catch (RuntimeException e) {
-                        failure = e;
-                    }
-                }
-            }
-
-            CloseOnceInputStream activeReader = reader.getAndSet(null);
-            if (activeReader != null) {
-                try {
-                    activeReader.close();
-                } catch (IOException e) {
-                    RuntimeException closeFailure = new UncheckedIOException(e);
-                    if (failure == null) {
-                        failure = closeFailure;
-                    } else {
-                        failure.addSuppressed(closeFailure);
-                    }
-                }
-            }
-
-            if (failure != null) {
-                throw failure;
-            }
-        }
-    }
-
-    private static final class CloseOnceInputStream extends FilterInputStream {
-        private final AtomicBoolean closed = new AtomicBoolean();
-
-        private CloseOnceInputStream(InputStream inputStream) {
-            super(inputStream);
-        }
-
-        @Override
-        public void close() throws IOException {
-            if (closed.compareAndSet(false, true)) {
-                super.close();
-            }
-        }
+        return true;
     }
 
     @Builder

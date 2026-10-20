@@ -142,8 +142,9 @@ public class DocumentDBClient implements AutoCloseable {
             MongoCollection<Document> mongoCollection = mongoClient.getDatabase(database).getCollection(collection);
             List<Document> documentsToInsert = documents.stream().map(this::toDocument).toList();
             InsertManyResult result = mongoCollection.insertMany(documentsToInsert);
-            List<String> insertedIds = result.getInsertedIds().values().stream()
-                .map(this::toIdString)
+            List<String> insertedIds = result.getInsertedIds().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> toIdString(entry.getValue()))
                 .toList();
             return new InsertResult(insertedIds, insertedIds.size());
         } catch (Exception e) {

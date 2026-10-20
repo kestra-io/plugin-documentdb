@@ -11,10 +11,13 @@ import java.security.cert.CertificateFactory;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.bson.BsonString;
+import org.bson.BsonValue;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.junit.jupiter.api.Test;
@@ -25,6 +28,9 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CountOptions;
+import com.mongodb.client.result.InsertManyResult;
+
+import io.kestra.plugin.documentdb.models.InsertResult;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -137,6 +143,32 @@ class DocumentDBClientTest {
         assertEquals(new Document("active", true), filter.getValue());
         assertEquals(5, options.getValue().getLimit());
         assertEquals(2L, options.getValue().getSkip());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldReturnInsertedIdsInInputOrder() throws Exception {
+        MongoClient mongoClient = mock(MongoClient.class);
+        MongoDatabase database = mock(MongoDatabase.class);
+        MongoCollection<Document> collection = mock(MongoCollection.class);
+        InsertManyResult driverResult = mock(InsertManyResult.class);
+        Map<Integer, BsonValue> ids = new LinkedHashMap<>();
+        ids.put(1, new BsonString("second-id"));
+        ids.put(0, new BsonString("first-id"));
+        when(mongoClient.getDatabase("test_db")).thenReturn(database);
+        when(database.getCollection("records")).thenReturn(collection);
+        when(collection.insertMany(any())).thenReturn(driverResult);
+        when(driverResult.getInsertedIds()).thenReturn(ids);
+        DocumentDBClient client = new DocumentDBClient(mongoClient);
+
+        InsertResult result = client.insertMany(
+            "test_db",
+            "records",
+            List.of(Map.of("name", "first"), Map.of("name", "second"))
+        );
+
+        assertEquals(List.of("first-id", "second-id"), result.getInsertedIds());
+        assertEquals(2, result.getInsertedCount());
     }
 
     private String readCertificateBundle() throws IOException {

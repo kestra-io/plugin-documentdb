@@ -215,6 +215,12 @@ public abstract class AbstractDocumentDBTask extends Task implements WorkerJobLi
         closeQuietly(activeResource.getAndSet(null), "task resource");
     }
 
+    protected final void checkIfKilled() {
+        if (killed.get()) {
+            throw cancelled();
+        }
+    }
+
     private static CancellationException cancelled() {
         return new CancellationException("DocumentDB task was cancelled");
     }
@@ -259,7 +265,7 @@ public abstract class AbstractDocumentDBTask extends Task implements WorkerJobLi
         description = "Deprecated. Use connectionString with an Amazon DocumentDB MongoDB-compatible connection URI. A legacy host value is accepted only if it is already a mongodb:// or mongodb+srv:// URI; the former HTTPS API endpoint cannot be translated."
     )
     @ToString.Exclude
-    @PluginProperty(group = "main", secret = true)
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> host;
 
     @Schema(
@@ -267,7 +273,7 @@ public abstract class AbstractDocumentDBTask extends Task implements WorkerJobLi
         description = "Recommended connection URI for Amazon DocumentDB, consumed by the MongoDB Java Driver, for example: mongodb://<user>:<password>@<cluster>.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
     )
     @ToString.Exclude
-    @PluginProperty(group = "main", secret = true)
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> connectionString;
 
     /**
@@ -279,7 +285,7 @@ public abstract class AbstractDocumentDBTask extends Task implements WorkerJobLi
         description = "Deprecated. The MongoDB Java Driver does not use this legacy HTTP Basic-auth property; configure credentials in connectionString."
     )
     @ToString.Exclude
-    @PluginProperty(group = "main", secret = true)
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> username;
 
     /**
@@ -291,7 +297,7 @@ public abstract class AbstractDocumentDBTask extends Task implements WorkerJobLi
         description = "Deprecated. The MongoDB Java Driver does not use this legacy HTTP Basic-auth property; configure credentials in connectionString."
     )
     @ToString.Exclude
-    @PluginProperty(group = "main", secret = true)
+    @PluginProperty(group = "connection", secret = true)
     protected Property<String> password;
 
     @Schema(
