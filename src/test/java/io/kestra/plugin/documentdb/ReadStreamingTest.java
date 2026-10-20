@@ -68,7 +68,6 @@ class ReadStreamingTest {
             output.getRows()
         );
         verify(cursor).close();
-        verify(client, never()).find(anyString(), anyString(), any(), any(), any());
     }
 
     @Test
@@ -121,8 +120,6 @@ class ReadStreamingTest {
         }
         verify(cursor, times(3)).hasNext();
         verify(cursor).close();
-        verify(client, never()).aggregate(anyString(), anyString(), anyList());
-        verify(client, never()).find(anyString(), anyString(), any(), any(), any());
     }
 
     @Test
@@ -147,7 +144,37 @@ class ReadStreamingTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void shouldCountFindResultsWithoutCollectingThemForNone() throws Exception {
+    void shouldCountFindResultsOnTheServerWithFilterSkipAndLimitForNone() throws Exception {
+        DocumentDBClient client = client();
+        when(client.countDocuments(anyString(), anyString(), any(), any(), any())).thenReturn(2L);
+        Read task = Read.builder()
+            .id("streaming-read-count")
+            .type(Read.class.getName())
+            .connectionString(Property.ofValue("mongodb://localhost:27017/test_db"))
+            .database(Property.ofValue(DATABASE))
+            .collection(Property.ofValue(COLLECTION))
+            .filter(Property.ofValue(Map.of("active", true)))
+            .limit(Property.ofValue(5))
+            .skip(Property.ofValue(2))
+            .fetchType(Property.ofValue(FetchType.NONE))
+            .build();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        Read.Output output = task.run(runContext, client);
+
+        assertEquals(2L, output.getSize());
+        assertNull(output.getRows());
+        assertNull(output.getRow());
+        assertNull(output.getUri());
+        verify(client).countDocuments(DATABASE, COLLECTION, Map.of("active", true), 5, 2);
+        verify(client, never()).findIterable(anyString(), anyString(), any(), any(), any());
+        verify(client, never()).aggregateIterable(anyString(), anyString(), anyList());
+        verify(client, never()).toRecord(any(Document.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldCountFindResultsWithNegativeSkipUsingCursorForNone() throws Exception {
+        Map<String, Object> filter = Map.of("active", true);
         MongoCursor<Document> cursor = cursor(
             new Document("_id", "first"),
             new Document("_id", "second")
@@ -157,17 +184,37 @@ class ReadStreamingTest {
         DocumentDBClient client = client();
         when(client.findIterable(anyString(), anyString(), any(), any(), any())).thenReturn(iterable);
 
-        Read.Output output = runTask(FetchType.NONE, client);
+        Read.Output output = runFindTaskWithOptions(client, filter, 5, -2);
 
         assertEquals(2L, output.getSize());
         assertNull(output.getRows());
-        assertNull(output.getRow());
-        assertNull(output.getUri());
-        verify(client).findIterable(anyString(), anyString(), any(), any(), any());
-        verify(client, never()).aggregateIterable(anyString(), anyString(), anyList());
+        verify(client).findIterable(DATABASE, COLLECTION, filter, 5, -2);
+        verify(client, never()).countDocuments(anyString(), anyString(), any(), any(), any());
         verify(cursor, times(2)).next();
         verify(cursor).close();
-        verify(client, never()).toRecord(any(Document.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldCountFindResultsWithNegativeLimitUsingCursorForNone() throws Exception {
+        Map<String, Object> filter = Map.of("active", true);
+        MongoCursor<Document> cursor = cursor(
+            new Document("_id", "first"),
+            new Document("_id", "second")
+        );
+        FindIterable<Document> iterable = mock(FindIterable.class);
+        when(iterable.iterator()).thenReturn(cursor);
+        DocumentDBClient client = client();
+        when(client.findIterable(anyString(), anyString(), any(), any(), any())).thenReturn(iterable);
+
+        Read.Output output = runFindTaskWithOptions(client, filter, -2, 1);
+
+        assertEquals(2L, output.getSize());
+        assertNull(output.getRows());
+        verify(client).findIterable(DATABASE, COLLECTION, filter, -2, 1);
+        verify(client, never()).countDocuments(anyString(), anyString(), any(), any(), any());
+        verify(cursor, times(2)).next();
+        verify(cursor).close();
     }
 
     @Test
@@ -236,9 +283,28 @@ class ReadStreamingTest {
     private Read.Output runTask(
         FetchType fetchType,
         DocumentDBClient client,
-        List<Map<String, Object>> pipeline
-    ) throws Exception {
+        List<Map<String, Object>> pipeline) throws Exception {
         Read task = createTask(fetchType, pipeline);
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+        return task.run(runContext, client);
+    }
+
+    private Read.Output runFindTaskWithOptions(
+        DocumentDBClient client,
+        Map<String, Object> filter,
+        Integer limit,
+        Integer skip) throws Exception {
+        Read task = Read.builder()
+            .id("streaming-read-negative-count")
+            .type(Read.class.getName())
+            .connectionString(Property.ofValue("mongodb://localhost:27017/test_db"))
+            .database(Property.ofValue(DATABASE))
+            .collection(Property.ofValue(COLLECTION))
+            .filter(Property.ofValue(filter))
+            .limit(Property.ofValue(limit))
+            .skip(Property.ofValue(skip))
+            .fetchType(Property.ofValue(FetchType.NONE))
+            .build();
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
         return task.run(runContext, client);
     }

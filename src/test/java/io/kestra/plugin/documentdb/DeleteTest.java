@@ -8,6 +8,10 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -21,10 +25,12 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 @KestraTest
+@Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DeleteTest {
 
-    private static final String CONNECTION_STRING = "mongodb://testuser:testpass@localhost:27017/test_db?authSource=admin";
+    @Container
+    private static final MongoDBContainer MONGODB = new MongoDBContainer(DockerImageName.parse("mongo:7.0.14"));
     private static final String DATABASE = "test_db";
     private static final String INVALID_CONNECTION_STRING = "mongodb://127.0.0.1:1/test_db?serverSelectionTimeoutMS=1000&connectTimeoutMS=1000";
     private static final String COLLECTION = "delete_test";
@@ -113,7 +119,7 @@ class DeleteTest {
         Insert insertTask = Insert.builder()
             .id("setup-delete-test")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .document(
@@ -136,7 +142,7 @@ class DeleteTest {
         Delete deleteTask = Delete.builder()
             .id("delete-single-integration-test")
             .type(Delete.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .filter(Property.ofValue(Map.of("_id", docId)))
@@ -157,7 +163,7 @@ class DeleteTest {
         Insert insertTask = Insert.builder()
             .id("setup-delete-many-test")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .documents(
@@ -178,7 +184,7 @@ class DeleteTest {
         Delete deleteTask = Delete.builder()
             .id("delete-many-integration-test")
             .type(Delete.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .filter(Property.ofValue(Map.of("category", "cleanup-test")))
@@ -198,7 +204,7 @@ class DeleteTest {
         Delete deleteTask = Delete.builder()
             .id("delete-no-match-test")
             .type(Delete.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .filter(Property.ofValue(Map.of("_id", "non-existent-document-" + System.currentTimeMillis())))

@@ -3,9 +3,6 @@ package io.kestra.plugin.documentdb;
 import java.lang.reflect.Field;
 import java.util.Map;
 
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
@@ -15,9 +12,13 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.TestsUtils;
-import io.swagger.v3.oas.annotations.media.Schema;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.inject.Inject;
+import jakarta.validation.constraints.NotNull;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -33,7 +34,7 @@ class AbstractDocumentDBTaskPropertiesTest {
     private RunContextFactory runContextFactory;
 
     @Test
-    void deprecatedPropertiesRemainAvailableAndDescribed() throws Exception {
+    void deprecatedConnectionPropertiesRemainAvailableAndDescribed() throws Exception {
         Field host = AbstractDocumentDBTask.class.getDeclaredField("host");
         Field username = AbstractDocumentDBTask.class.getDeclaredField("username");
         Field password = AbstractDocumentDBTask.class.getDeclaredField("password");
@@ -43,11 +44,12 @@ class AbstractDocumentDBTaskPropertiesTest {
         assertTrue(host.isAnnotationPresent(Deprecated.class));
         assertTrue(username.isAnnotationPresent(Deprecated.class));
         assertTrue(password.isAnnotationPresent(Deprecated.class));
-        assertTrue(collection.isAnnotationPresent(Deprecated.class));
+        assertFalse(collection.isAnnotationPresent(Deprecated.class));
         assertTrue(host.getAnnotation(Schema.class).description().contains("connectionString"));
         assertTrue(username.getAnnotation(Schema.class).description().contains("connectionString"));
         assertTrue(password.getAnnotation(Schema.class).description().contains("connectionString"));
-        assertTrue(collection.getAnnotation(Schema.class).description().contains("no replacement property"));
+        assertEquals("Target collection", collection.getAnnotation(Schema.class).title());
+        assertTrue(collection.isAnnotationPresent(NotNull.class));
         assertNotNull(connectionString.getAnnotation(Schema.class));
         assertFalse(connectionString.isAnnotationPresent(Deprecated.class));
         assertTrue(host.getAnnotation(PluginProperty.class).secret());
@@ -56,7 +58,7 @@ class AbstractDocumentDBTaskPropertiesTest {
 
     @Test
     void connectionStringAndLegacyMongoUriResolveAndWarn() throws Exception {
-        Logger logger = (Logger) LoggerFactory.getLogger(AbstractDocumentDBTask.class);
+        Logger logger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
@@ -88,7 +90,11 @@ class AbstractDocumentDBTaskPropertiesTest {
             assertTrue(appender.list.stream().anyMatch(event -> event.getFormattedMessage().contains("deprecated 'host'")));
             assertTrue(appender.list.stream().anyMatch(event -> event.getFormattedMessage().contains("deprecated 'username'")));
             assertTrue(appender.list.stream().anyMatch(event -> event.getFormattedMessage().contains("deprecated 'password'")));
-            assertTrue(appender.list.stream().anyMatch(event -> event.getFormattedMessage().contains("'collection' property is deprecated")));
+            assertTrue(
+                appender.list.stream()
+                    .filter(event -> event.getFormattedMessage().contains("deprecated"))
+                    .allMatch(event -> !event.getLoggerName().equals(AbstractDocumentDBTask.class.getName()))
+            );
         } finally {
             logger.detachAppender(appender);
             appender.stop();

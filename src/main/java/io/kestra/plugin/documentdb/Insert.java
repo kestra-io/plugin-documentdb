@@ -177,7 +177,7 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
         boolean hasDocuments = rDocuments instanceof List<?> documents && !documents.isEmpty();
         int inputCount = (hasDocument ? 1 : 0) + (hasFrom ? 1 : 0) + (hasDocuments ? 1 : 0);
         if (inputCount == 0) {
-            throw new IllegalArgumentException("Either 'document' for single insert or 'documents' for multiple inserts must be provided");
+            throw new IllegalArgumentException("No document to insert: set one of 'document', 'from', or 'documents'");
         }
         if (inputCount > 1) {
             throw new IllegalArgumentException("Cannot specify both 'document' and batch inputs; choose only one of 'document', 'from', or 'documents'");
@@ -317,7 +317,7 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
         }
 
         if (documents.isEmpty()) {
-            throw new IllegalArgumentException("Either 'document' for single insert or 'documents' for multiple inserts must be provided");
+            throw new IllegalArgumentException("No document to insert: set one of 'document', 'from', or 'documents'");
         }
         if (documents.size() > MAX_DOCUMENTS_PER_INSERT) {
             throw tooManyDocuments();

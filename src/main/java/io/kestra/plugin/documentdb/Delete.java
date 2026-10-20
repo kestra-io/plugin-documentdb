@@ -11,6 +11,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.documentdb.models.DeleteResult;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -120,7 +121,8 @@ public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delet
         Map<String, Object> rFilter = runContext.render(this.filter).asMap(String.class, Object.class);
         Boolean rDeleteMany = runContext.render(this.deleteMany).as(Boolean.class).orElse(false);
 
-        return withClient(rConnectionString, rCaCertificate, client -> {
+        return withClient(rConnectionString, rCaCertificate, client ->
+        {
             if (rDeleteMany) {
                 // Delete multiple documents
                 logger.info("Deleting multiple documents from DocumentDB database: {} collection: {}", rDatabase, rCollection);

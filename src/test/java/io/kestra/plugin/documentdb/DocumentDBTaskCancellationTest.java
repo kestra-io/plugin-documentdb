@@ -18,8 +18,8 @@ import org.junit.jupiter.api.Test;
 
 import com.mongodb.client.MongoCursor;
 
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,12 +40,12 @@ class DocumentDBTaskCancellationTest {
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            Future<?> running = executor.submit(() -> task.runWithClient(activeClient ->
-                task.runWithCursor(cursor, activeCursor -> {
-                    cursorInUse.countDown();
-                    finishOperation.await();
-                    return null;
-                })
+            Future<?> running = executor.submit(() -> task.runWithClient(activeClient -> task.runWithCursor(cursor, activeCursor ->
+            {
+                cursorInUse.countDown();
+                finishOperation.await();
+                return null;
+            })
             ));
 
             assertTrue(cursorInUse.await(5, TimeUnit.SECONDS));
@@ -95,7 +95,8 @@ class DocumentDBTaskCancellationTest {
         DocumentDBClient client = mock(DocumentDBClient.class);
         TestDocumentDBTask task = new TestDocumentDBTask(client);
 
-        assertThrows(IllegalStateException.class, () -> task.runWithClient(activeClient -> {
+        assertThrows(IllegalStateException.class, () -> task.runWithClient(activeClient ->
+        {
             throw new IllegalStateException("operation failed");
         }));
 
@@ -112,7 +113,8 @@ class DocumentDBTaskCancellationTest {
 
         IllegalStateException thrown = assertThrows(
             IllegalStateException.class,
-            () -> task.runWithClient(activeClient -> {
+            () -> task.runWithClient(activeClient ->
+            {
                 throw operationFailure;
             })
         );
@@ -144,7 +146,8 @@ class DocumentDBTaskCancellationTest {
 
         IllegalStateException thrown = assertThrows(
             IllegalStateException.class,
-            () -> task.runWithCursor(cursor, activeCursor -> {
+            () -> task.runWithCursor(cursor, activeCursor ->
+            {
                 throw operationFailure;
             })
         );
@@ -167,7 +170,8 @@ class DocumentDBTaskCancellationTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         try {
-            Future<?> consuming = executor.submit(() -> {
+            Future<?> consuming = executor.submit(() ->
+            {
                 try {
                     Stream<Map<String, Object>> stream = records.toStream(1);
                     inputResource.registerStream(stream);
@@ -198,7 +202,8 @@ class DocumentDBTaskCancellationTest {
         CountDownLatch openingReader = new CountDownLatch(1);
         CountDownLatch finishOpening = new CountDownLatch(1);
         BlockingInputStream inputStream = new BlockingInputStream();
-        var records = Insert.readIonRecords(() -> {
+        var records = Insert.readIonRecords(() ->
+        {
             openingReader.countDown();
             try {
                 finishOpening.await();
@@ -211,7 +216,8 @@ class DocumentDBTaskCancellationTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         try {
-            Future<?> consuming = executor.submit(() -> {
+            Future<?> consuming = executor.submit(() ->
+            {
                 try (Stream<Map<String, Object>> stream = records.toStream(1)) {
                     inputResource.registerStream(stream);
                     stream.findFirst();
@@ -246,8 +252,7 @@ class DocumentDBTaskCancellationTest {
         private TestDocumentDBTask(
             DocumentDBClient client,
             CountDownLatch creatingClient,
-            CountDownLatch finishCreation
-        ) {
+            CountDownLatch finishCreation) {
             this.client = client;
             this.creatingClient = creatingClient;
             this.finishCreation = finishCreation;

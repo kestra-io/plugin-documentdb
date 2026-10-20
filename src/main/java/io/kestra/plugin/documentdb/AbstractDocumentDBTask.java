@@ -92,13 +92,13 @@ public abstract class AbstractDocumentDBTask extends Task implements WorkerJobLi
 
     protected final String resolveConnectionString(RunContext runContext) throws Exception {
         if (this.host != null) {
-            LOGGER.warn("The deprecated 'host' property is in use. Configure 'connectionString' instead.");
+            runContext.logger().warn("The deprecated 'host' property is in use. Configure 'connectionString' instead.");
         }
         if (this.username != null) {
-            LOGGER.warn("The deprecated 'username' property is in use. Configure credentials in 'connectionString' instead.");
+            runContext.logger().warn("The deprecated 'username' property is in use. Configure credentials in 'connectionString' instead.");
         }
         if (this.password != null) {
-            LOGGER.warn("The deprecated 'password' property is in use. Configure credentials in 'connectionString' instead.");
+            runContext.logger().warn("The deprecated 'password' property is in use. Configure credentials in 'connectionString' instead.");
         }
         if (this.host != null && this.connectionString != null) {
             throw new IllegalArgumentException("Both deprecated 'host' and 'connectionString' are configured; remove 'host' and use 'connectionString'.");
@@ -117,9 +117,6 @@ public abstract class AbstractDocumentDBTask extends Task implements WorkerJobLi
     }
 
     protected final String renderCollection(RunContext runContext) throws Exception {
-        if (this.collection != null) {
-            LOGGER.warn("The 'collection' property is deprecated and retained for compatibility; continue using it during the deprecation period.");
-        }
         return runContext.render(this.collection).as(String.class).orElseThrow();
     }
 
@@ -313,13 +310,9 @@ public abstract class AbstractDocumentDBTask extends Task implements WorkerJobLi
     @PluginProperty(group = "main")
     protected Property<String> database;
 
-    /**
-     * @deprecated This property is retained for compatibility; no replacement property is currently available.
-     */
-    @Deprecated
     @Schema(
-        title = "Target collection (deprecated)",
-        description = "Deprecated and retained for compatibility. Continue specifying the collection during the deprecation period; no replacement property is currently available."
+        title = "Target collection",
+        description = "Collection name used for the operation; expressions are rendered at runtime."
     )
     @NotNull
     @PluginProperty(group = "main")

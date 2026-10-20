@@ -6,6 +6,10 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -20,13 +24,15 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 @KestraTest
+@Testcontainers(disabledWithoutDocker = true)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReadTest {
 
+    @Container
+    private static final MongoDBContainer MONGODB = new MongoDBContainer(DockerImageName.parse("mongo:7.0.14"));
+
     @Inject
     private RunContextFactory runContextFactory;
-
-    private static final String CONNECTION_STRING = "mongodb://testuser:testpass@localhost:27017/test_db?authSource=admin";
     private static final String DATABASE = "test_db";
     private static final String COLLECTION = "read_test";
 
@@ -37,7 +43,7 @@ class ReadTest {
         Insert insertTask = Insert.builder()
             .id("setup-read-test-data")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .documents(
@@ -60,7 +66,7 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-read")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .fetchType(Property.ofValue(FetchType.FETCH))
@@ -86,7 +92,7 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-default")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .build();
@@ -113,7 +119,7 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-filter")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .filter(Property.ofValue(filter))
@@ -152,7 +158,7 @@ class ReadTest {
         Read task = Read.builder()
             .id("test-aggregation")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .aggregationPipeline(Property.ofValue(pipeline))
@@ -181,7 +187,7 @@ class ReadTest {
             Read task = Read.builder()
                 .id("test-fetchtype-" + fetchType.name())
                 .type(Read.class.getName())
-                .connectionString(Property.ofValue(CONNECTION_STRING))
+                .connectionString(Property.ofValue(MONGODB.getConnectionString()))
                 .database(Property.ofValue(DATABASE))
                 .collection(Property.ofValue(COLLECTION))
                 .fetchType(Property.ofValue(fetchType))

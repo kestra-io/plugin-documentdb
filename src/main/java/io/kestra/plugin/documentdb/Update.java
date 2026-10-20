@@ -84,6 +84,11 @@ import lombok.experimental.SuperBuilder;
                 id: increment_user_views
                 namespace: company.documentdb
 
+                inputs:
+                  - id: user_id
+                    type: STRING
+                    defaults: user-123
+
                 tasks:
                   - id: increment_views
                     type: io.kestra.plugin.documentdb.Update
@@ -146,7 +151,8 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
             throw new IllegalArgumentException("Update operations must be provided");
         }
 
-        return withClient(rConnectionString, rCaCertificate, client -> {
+        return withClient(rConnectionString, rCaCertificate, client ->
+        {
             if (rUpdateMany) {
                 // Update multiple documents
                 logger.info("Updating multiple documents in DocumentDB database: {} collection: {}", rDatabase, rCollection);

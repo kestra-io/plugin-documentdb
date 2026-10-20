@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -67,6 +68,36 @@ class InsertBatchTest {
         ArgumentCaptor<List<Map<String, Object>>> batches = ArgumentCaptor.forClass(List.class);
         verify(client).insertMany(anyString(), anyString(), batches.capture());
         assertEquals(List.of(10), batches.getAllValues().stream().map(List::size).toList());
+        verify(client).close();
+    }
+
+    @Test
+    void shouldInsertDocumentsFromJsonString() throws Exception {
+        DocumentDBClient client = mockClientFor();
+        Insert task = task(client, "[{\"_id\":\"json-id\",\"name\":\"JSON document\"}]");
+
+        Insert.Output output = task.run(context(task));
+
+        assertEquals(1, output.getInsertedCount());
+        assertEquals(List.of("json-id"), output.getInsertedIds());
+        verify(client).insertMany(anyString(), anyString(), anyList());
+        verify(client).close();
+    }
+
+    @Test
+    void shouldRenderTemplatesInInlineFromDocuments() throws Exception {
+        DocumentDBClient client = mockClientFor();
+        Insert task = task(
+            client,
+            List.of(new LinkedHashMap<>(Map.of("_id", "{{ inputs.user_id }}", "name", "Templated document")))
+        );
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of("user_id", "rendered-id"));
+
+        assertEquals("rendered-id", runContext.render(Map.of("_id", "{{ inputs.user_id }}")).get("_id"));
+        Insert.Output output = task.run(runContext);
+
+        assertEquals("rendered-id", output.getInsertedId());
+        verify(client).insertMany(anyString(), anyString(), anyList());
         verify(client).close();
     }
 
@@ -160,9 +191,63 @@ class InsertBatchTest {
             () -> task.run(context(task))
         );
 
-        assertTrue(exception.getMessage().contains("Either 'document'"));
+        assertEquals(
+            "No document to insert: set one of 'document', 'from', or 'documents'",
+            exception.getMessage()
+        );
         verify(client, never()).insertMany(anyString(), anyString(), anyList());
         verify(client, never()).close();
+    }
+
+    @Test
+    void shouldRejectMissingInputSources() throws Exception {
+        Insert task = Insert.builder()
+            .id("missing-insert-input")
+            .type(Insert.class.getName())
+            .connectionString(Property.ofValue("mongodb://localhost:27017/test_db"))
+            .database(Property.ofValue(DATABASE))
+            .collection(Property.ofValue(COLLECTION))
+            .build();
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> task.run(context(task))
+        );
+
+        assertEquals(
+            "No document to insert: set one of 'document', 'from', or 'documents'",
+            exception.getMessage()
+        );
+    }
+
+    @Test
+    void shouldRejectEmptyFromListInput() throws Exception {
+        DocumentDBClient client = mock(DocumentDBClient.class);
+        Insert task = task(client, List.of());
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> task.run(context(task))
+        );
+
+        assertTrue(exception.getMessage().contains("'document', 'from', or 'documents'"));
+        verify(client, never()).insertMany(anyString(), anyString(), anyList());
+        verify(client, never()).close();
+    }
+
+    @Test
+    void shouldRejectEmptyFromPayload() throws Exception {
+        DocumentDBClient client = mock(DocumentDBClient.class);
+        Insert task = task(client, "[]");
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> task.run(context(task))
+        );
+
+        assertTrue(exception.getMessage().contains("'document', 'from', or 'documents'"));
+        verify(client, never()).insertMany(anyString(), anyString(), anyList());
+        verify(client).close();
     }
 
     @Test
@@ -236,7 +321,7 @@ class InsertBatchTest {
             () -> task.run(context(task))
         );
 
-        assertTrue(exception.getMessage().contains("Either 'document'"));
+        assertTrue(exception.getMessage().contains("'document', 'from', or 'documents'"));
         verify(client, never()).insertOne(anyString(), anyString(), anyMap());
         verify(client, never()).insertMany(anyString(), anyString(), anyList());
         verify(client, never()).close();

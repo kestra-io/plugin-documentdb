@@ -30,6 +30,7 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.documentdb.models.DocumentDBException;
 import io.kestra.plugin.documentdb.models.DocumentDBRecord;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
@@ -38,7 +39,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-
 import reactor.core.publisher.Flux;
 
 @SuperBuilder
@@ -192,8 +192,15 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
         FetchType rFetchType = runContext.render(this.fetchType).as(FetchType.class).orElse(FetchType.FETCH);
         Output.OutputBuilder outputBuilder = Output.builder();
 
-        MongoIterable<Document> results;
         boolean aggregation = rAggregationPipeline != null && !rAggregationPipeline.isEmpty();
+        boolean canCountOnServer = (rLimit == null || rLimit >= 0) && (rSkip == null || rSkip >= 0);
+        if (rFetchType == FetchType.NONE && !aggregation && canCountOnServer) {
+            logger.info("Counting documents in DocumentDB database: {} collection: {}", rDatabase, rCollection);
+            outputBuilder.size(client.countDocuments(rDatabase, rCollection, rFilter, rLimit, rSkip));
+            return outputBuilder.build();
+        }
+
+        MongoIterable<Document> results;
         if (aggregation) {
             logger.info(
                 "Executing aggregation pipeline on DocumentDB database: {} collection: {} with {} stages",
@@ -216,8 +223,8 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
 
         try {
             if (rFetchType == FetchType.FETCH_ONE) {
-                Map<String, Object> row = withCursor(results.iterator(), cursor ->
-                    cursor.hasNext()
+                Map<String, Object> row = withCursor(
+                    results.iterator(), cursor -> cursor.hasNext()
                         ? convertRecordToMap(client.toRecord(cursor.next()))
                         : null
                 );
@@ -229,7 +236,8 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
                 );
                 outputBuilder.size(storedResult.getCount()).uri(storedResult.getUri());
             } else if (rFetchType == FetchType.NONE) {
-                long count = withCursor(results.iterator(), cursor -> {
+                long count = withCursor(results.iterator(), cursor ->
+                {
                     long resultCount = 0;
                     while (cursor.hasNext()) {
                         cursor.next();
@@ -239,7 +247,8 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
                 });
                 outputBuilder.size(count);
             } else {
-                List<Map<String, Object>> rows = withCursor(results.iterator(), cursor -> {
+                List<Map<String, Object>> rows = withCursor(results.iterator(), cursor ->
+                {
                     List<Map<String, Object>> collectedRows = new ArrayList<>();
                     while (cursor.hasNext()) {
                         collectedRows.add(convertRecordToMap(client.toRecord(cursor.next())));
@@ -276,18 +285,20 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
     private StoredResult storeRecordsAsFile(
         RunContext runContext,
         MongoCursor<Document> cursor,
-        DocumentDBClient client
-    ) throws IOException {
+        DocumentDBClient client) throws IOException {
         File tempFile;
         long count;
 
         try {
             tempFile = runContext.workingDir().createTempFile(".ion").toFile();
-            try (OutputStream outputStream = new BufferedOutputStream(
-                Files.newOutputStream(tempFile.toPath()),
-                FileSerde.BUFFER_SIZE
-            )) {
-                Flux<Map<String, Object>> recordFlux = Flux.<Map<String, Object>>generate(sink -> {
+            try (
+                OutputStream outputStream = new BufferedOutputStream(
+                    Files.newOutputStream(tempFile.toPath()),
+                    FileSerde.BUFFER_SIZE
+                )
+            ) {
+                Flux<Map<String, Object>> recordFlux = Flux.<Map<String, Object>> generate(sink ->
+                {
                     if (cursor.hasNext()) {
                         sink.next(convertRecordToMap(client.toRecord(cursor.next())));
                     } else {

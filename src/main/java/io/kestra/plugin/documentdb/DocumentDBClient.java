@@ -30,7 +30,7 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.CountOptions;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 
@@ -53,9 +53,11 @@ public class DocumentDBClient implements AutoCloseable {
 
         if (caCertificate != null && !caCertificate.isBlank()) {
             SSLContext sslContext = createSslContext(caCertificate);
-            settingsBuilder.applyToSslSettings(sslSettings -> sslSettings
-                .enabled(true)
-                .context(sslContext));
+            settingsBuilder.applyToSslSettings(
+                sslSettings -> sslSettings
+                    .enabled(true)
+                    .context(sslContext)
+            );
         }
 
         this.mongoClient = MongoClients.create(settingsBuilder.build());
@@ -68,23 +70,23 @@ public class DocumentDBClient implements AutoCloseable {
     static SSLContext createSslContext(String caCertificate)
         throws GeneralSecurityException, IOException {
 
-        CertificateFactory certificateFactory =
-            CertificateFactory.getInstance("X.509");
+        CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
 
         Collection<? extends Certificate> certificates;
 
-        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(
-            caCertificate.getBytes(StandardCharsets.UTF_8)
-        )) {
+        try (
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(
+                caCertificate.getBytes(StandardCharsets.UTF_8)
+            )
+        ) {
             certificates = certificateFactory.generateCertificates(inputStream);
         }
 
         KeyStore trustStore = createTrustStore(certificates);
 
-        TrustManagerFactory trustManagerFactory =
-            TrustManagerFactory.getInstance(
-                TrustManagerFactory.getDefaultAlgorithm()
-            );
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
+            TrustManagerFactory.getDefaultAlgorithm()
+        );
 
         trustManagerFactory.init(trustStore);
 
@@ -95,8 +97,7 @@ public class DocumentDBClient implements AutoCloseable {
     }
 
     static KeyStore createTrustStore(
-        Collection<? extends Certificate> certificates
-    ) throws GeneralSecurityException, IOException {
+        Collection<? extends Certificate> certificates) throws GeneralSecurityException, IOException {
 
         if (certificates.isEmpty()) {
             throw new GeneralSecurityException(
@@ -150,21 +151,6 @@ public class DocumentDBClient implements AutoCloseable {
         }
     }
 
-    public List<DocumentDBRecord> find(String database, String collection, Map<String, Object> filter,
-        Integer limit, Integer skip) throws Exception {
-        try {
-            List<DocumentDBRecord> records = new ArrayList<>();
-            try (MongoCursor<Document> cursor = findIterable(database, collection, filter, limit, skip).iterator()) {
-                while (cursor.hasNext()) {
-                    records.add(toRecord(cursor.next()));
-                }
-            }
-            return records;
-        } catch (Exception e) {
-            throw new DocumentDBException("Failed to find documents: " + e.getMessage(), e);
-        }
-    }
-
     FindIterable<Document> findIterable(String database, String collection, Map<String, Object> filter,
         Integer limit, Integer skip) {
         MongoCollection<Document> mongoCollection = mongoClient.getDatabase(database).getCollection(collection);
@@ -179,25 +165,28 @@ public class DocumentDBClient implements AutoCloseable {
         return iterable;
     }
 
-    public List<DocumentDBRecord> aggregate(String database, String collection, List<Map<String, Object>> pipeline) throws Exception {
+    long countDocuments(String database, String collection, Map<String, Object> filter, Integer limit, Integer skip)
+        throws DocumentDBException {
         try {
-            List<DocumentDBRecord> records = new ArrayList<>();
-            try (MongoCursor<Document> cursor = aggregateIterable(database, collection, pipeline).iterator()) {
-                while (cursor.hasNext()) {
-                    records.add(toRecord(cursor.next()));
-                }
+            MongoCollection<Document> mongoCollection = mongoClient.getDatabase(database).getCollection(collection);
+            Document filterDocument = filter == null || filter.isEmpty() ? new Document() : toDocument(filter);
+            CountOptions options = new CountOptions();
+            if (limit != null) {
+                options.limit(limit);
             }
-            return records;
+            if (skip != null) {
+                options.skip(skip);
+            }
+            return mongoCollection.countDocuments(filterDocument, options);
         } catch (Exception e) {
-            throw new DocumentDBException("Failed to execute aggregation: " + e.getMessage(), e);
+            throw new DocumentDBException("Failed to count documents: " + e.getMessage(), e);
         }
     }
 
     AggregateIterable<Document> aggregateIterable(
         String database,
         String collection,
-        List<Map<String, Object>> pipeline
-    ) {
+        List<Map<String, Object>> pipeline) {
         MongoCollection<Document> mongoCollection = mongoClient.getDatabase(database).getCollection(collection);
         List<Document> pipelineDocuments = pipeline.stream().map(this::toDocument).toList();
         return mongoCollection.aggregate(pipelineDocuments);

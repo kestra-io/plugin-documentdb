@@ -16,25 +16,28 @@ import java.util.Map;
 import java.util.Set;
 
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import com.mongodb.client.AggregateIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.CountOptions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DocumentDBClientTest {
 
-    private static final String CERTIFICATE_BUNDLE_RESOURCE =
-        "/io/kestra/plugin/documentdb/multi-certificates.pem";
+    private static final String CERTIFICATE_BUNDLE_RESOURCE = "/io/kestra/plugin/documentdb/multi-certificates.pem";
 
     @Test
     void shouldLoadEveryCertificateInPemBundle() throws Exception {
@@ -43,11 +46,12 @@ class DocumentDBClientTest {
         assertNotNull(DocumentDBClient.createSslContext(certificateBundle));
 
         Collection<? extends Certificate> certificates;
-        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(
-            certificateBundle.getBytes(StandardCharsets.US_ASCII)
-        )) {
-            certificates =
-                CertificateFactory.getInstance("X.509").generateCertificates(inputStream);
+        try (
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(
+                certificateBundle.getBytes(StandardCharsets.US_ASCII)
+            )
+        ) {
+            certificates = CertificateFactory.getInstance("X.509").generateCertificates(inputStream);
         }
 
         assertEquals(2, certificates.size());
@@ -105,6 +109,34 @@ class DocumentDBClientTest {
         client.aggregateIterable("test_db", "records", pipeline);
 
         verify(collection).aggregate(expectedPipeline);
+    }
+
+    @Test
+    void shouldCountDocumentsWithTheRequestedFilterSkipAndLimit() throws Exception {
+        MongoClient mongoClient = mock(MongoClient.class);
+        MongoDatabase database = mock(MongoDatabase.class);
+        MongoCollection<Document> collection = mock(MongoCollection.class);
+        when(mongoClient.getDatabase("test_db")).thenReturn(database);
+        when(database.getCollection("records")).thenReturn(collection);
+        when(collection.countDocuments(any(Bson.class), any(CountOptions.class))).thenReturn(2L);
+        DocumentDBClient client = new DocumentDBClient(mongoClient);
+
+        assertEquals(
+            2L, client.countDocuments(
+                "test_db",
+                "records",
+                Map.of("active", true),
+                5,
+                2
+            )
+        );
+
+        ArgumentCaptor<Bson> filter = ArgumentCaptor.forClass(Bson.class);
+        ArgumentCaptor<CountOptions> options = ArgumentCaptor.forClass(CountOptions.class);
+        verify(collection).countDocuments(filter.capture(), options.capture());
+        assertEquals(new Document("active", true), filter.getValue());
+        assertEquals(5, options.getValue().getLimit());
+        assertEquals(2L, options.getValue().getSkip());
     }
 
     private String readCertificateBundle() throws IOException {

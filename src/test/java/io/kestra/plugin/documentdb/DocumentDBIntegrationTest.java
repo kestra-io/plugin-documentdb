@@ -10,6 +10,10 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -24,24 +28,19 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 /**
- * Real integration tests for DocumentDB operations using local container.
- * These tests run against a real DocumentDB container and use actual credentials.
- *
- * To run these tests:
- * 1. Start DocumentDB: ./.github/setup-unit.sh
- * 2. Run tests: ./gradlew test
- *
- * No environment variables needed - tests use real credentials directly.
+ * Real integration tests for DocumentDB operations using a MongoDB Testcontainers instance.
  */
 @KestraTest
+@Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DocumentDBIntegrationTest {
 
+    @Container
+    private static final MongoDBContainer MONGODB = new MongoDBContainer(DockerImageName.parse("mongo:7.0.14"));
+
     @Inject
     RunContextFactory runContextFactory;
-
-    private static final String CONNECTION_STRING = "mongodb://testuser:testpass@localhost:27017/test_db?authSource=admin";
     private static final String DATABASE = "test_db";
     private static final String COLLECTION = "integration_test";
 
@@ -51,7 +50,7 @@ class DocumentDBIntegrationTest {
         Insert insertTask = Insert.builder()
             .id("setup-test-data")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .documents(
@@ -76,7 +75,7 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("fetch-one-real-test")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .filter(Property.ofValue(Map.of("category", "A")))
@@ -98,7 +97,7 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("limit-skip-real-test")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .filter(Property.ofValue(Map.of())) // Empty filter to get all documents
@@ -122,7 +121,7 @@ class DocumentDBIntegrationTest {
         Read readTask = Read.builder()
             .id("aggregation-real-test")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .aggregationPipeline(

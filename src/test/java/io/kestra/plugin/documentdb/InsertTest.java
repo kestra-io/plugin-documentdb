@@ -8,6 +8,10 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -22,10 +26,12 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 @KestraTest
+@Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class InsertTest {
 
-    private static final String CONNECTION_STRING = "mongodb://testuser:testpass@localhost:27017/test_db?authSource=admin";
+    @Container
+    private static final MongoDBContainer MONGODB = new MongoDBContainer(DockerImageName.parse("mongo:7.0.14"));
     private static final String DATABASE = "test_db";
     private static final String INVALID_CONNECTION_STRING = "mongodb://127.0.0.1:1/test_db?serverSelectionTimeoutMS=1000&connectTimeoutMS=1000";
     private static final String COLLECTION = "integration_test";
@@ -75,7 +81,7 @@ class InsertTest {
         Insert task = Insert.builder()
             .id("test-reject-both")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
             .document(Property.ofValue(Map.of("name", "Test Document")))
@@ -97,7 +103,7 @@ class InsertTest {
         Insert task = Insert.builder()
             .id("test-reject-neither")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
             .build();
@@ -108,7 +114,10 @@ class InsertTest {
             task.run(runContext);
             throw new AssertionError("Should have thrown IllegalArgumentException");
         } catch (IllegalArgumentException e) {
-            assertThat(e.getMessage(), containsString("must be provided"));
+            assertThat(
+                e.getMessage(),
+                is("No document to insert: set one of 'document', 'from', or 'documents'")
+            );
         }
     }
 
@@ -119,7 +128,7 @@ class InsertTest {
         Insert insertTask = Insert.builder()
             .id("insert-single-integration-test")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .document(
@@ -150,7 +159,7 @@ class InsertTest {
         Insert insertTask = Insert.builder()
             .id("insert-multiple-integration-test")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .documents(
@@ -182,7 +191,7 @@ class InsertTest {
         Insert insertTask = Insert.builder()
             .id("insert-verify-integration-test")
             .type(Insert.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .document(
@@ -210,7 +219,7 @@ class InsertTest {
         Read readTask = Read.builder()
             .id("read-verify-integration-test")
             .type(Read.class.getName())
-            .connectionString(Property.ofValue(CONNECTION_STRING))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
             .filter(Property.ofValue(Map.of("_id", insertedId)))
