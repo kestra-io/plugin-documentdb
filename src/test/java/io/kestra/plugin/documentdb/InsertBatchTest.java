@@ -35,16 +35,19 @@ import reactor.core.publisher.SignalType;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,7 +69,7 @@ class InsertBatchTest {
         Insert.Output output = task.run(context(task));
 
         assertEquals(10, output.getInsertedCount());
-        assertEquals(10, output.getInsertedIds().size());
+        assertEquals(List.of("id-0"), output.getInsertedIds());
         assertEquals("id-0", output.getInsertedId());
         ArgumentCaptor<List<Map<String, Object>>> batches = ArgumentCaptor.forClass(List.class);
         verify(client).insertMany(anyString(), anyString(), batches.capture());
@@ -76,7 +79,7 @@ class InsertBatchTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void shouldInsertMoreThanTenFromInBatchesAndAggregateResultsInOrder() throws Exception {
+    void shouldInsertMoreThanTenFromInBatchesAndKeepBoundedOutput() throws Exception {
         List<Map<String, Object>> input = documents(205);
         DocumentDBClient client = mockClientFor();
         Insert task = task(client, input);
@@ -84,14 +87,10 @@ class InsertBatchTest {
         Insert.Output output = task.run(context(task));
 
         assertEquals(205, output.getInsertedCount());
-        assertEquals(205, output.getInsertedIds().size());
+        assertEquals(List.of("id-0"), output.getInsertedIds());
         assertEquals("id-0", output.getInsertedId());
-        assertEquals(
-            input.stream().map(row -> (String) row.get("_id")).toList(),
-            output.getInsertedIds()
-        );
         ArgumentCaptor<List<Map<String, Object>>> batches = ArgumentCaptor.forClass(List.class);
-        verify(client, org.mockito.Mockito.times(3)).insertMany(anyString(), anyString(), batches.capture());
+        verify(client, times(3)).insertMany(anyString(), anyString(), batches.capture());
         assertEquals(List.of(100, 100, 5), batches.getAllValues().stream().map(List::size).toList());
         verify(client).close();
     }
@@ -157,7 +156,7 @@ class InsertBatchTest {
             Insert.Output output = task.run(context(task));
 
             assertEquals(12, output.getInsertedCount());
-            assertEquals(input.stream().map(row -> (String) row.get("_id")).toList(), output.getInsertedIds());
+            assertEquals(List.of("id-0"), output.getInsertedIds());
             ArgumentCaptor<List<Map<String, Object>>> batches = ArgumentCaptor.forClass(List.class);
             verify(client).insertMany(anyString(), anyString(), batches.capture());
             assertEquals(List.of(12), batches.getAllValues().stream().map(List::size).toList());
@@ -207,58 +206,79 @@ class InsertBatchTest {
     }
 
     @Test
-    void shouldRejectEmptyFromListInput() throws Exception {
+    void shouldReturnZeroForEmptyFromListInput() throws Exception {
         DocumentDBClient client = mock(DocumentDBClient.class);
         Insert task = task(client, List.of());
 
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> task.run(context(task))
-        );
+        Insert.Output output = task.run(context(task));
 
-        assertTrue(exception.getMessage().contains("'document', 'from', or 'documents'"));
-        verify(client, never()).insertMany(anyString(), anyString(), anyList());
-        verify(client, never()).close();
-    }
-
-    @Test
-    void shouldRejectEmptyFromPayload() throws Exception {
-        DocumentDBClient client = mock(DocumentDBClient.class);
-        Insert task = task(client, "[]");
-
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> task.run(context(task))
-        );
-
-        assertTrue(exception.getMessage().contains("'document', 'from', or 'documents'"));
+        assertEquals(0, output.getInsertedCount());
+        assertNull(output.getInsertedId());
+        assertEquals(List.of(), output.getInsertedIds());
         verify(client, never()).insertMany(anyString(), anyString(), anyList());
         verify(client).close();
     }
 
     @Test
-    void shouldPropagateLaterBatchFailureWithoutPartialOutputAndCloseClient() throws Exception {
+    void shouldReturnZeroForEmptyFromPayload() throws Exception {
+        DocumentDBClient client = mock(DocumentDBClient.class);
+        Insert task = task(client, "[]");
+
+        Insert.Output output = task.run(context(task));
+
+        assertEquals(0, output.getInsertedCount());
+        assertNull(output.getInsertedId());
+        assertEquals(List.of(), output.getInsertedIds());
+        verify(client, never()).insertMany(anyString(), anyString(), anyList());
+        verify(client).close();
+    }
+
+    @Test
+    void shouldReportSuccessfulCountAndBatchWhenInsertionFails() throws Exception {
         DocumentDBException failure = new DocumentDBException("insert failed");
         AtomicInteger calls = new AtomicInteger();
         DocumentDBClient client = mockClientFor();
         when(client.insertMany(anyString(), anyString(), anyList()))
             .thenAnswer(invocation ->
             {
-                if (calls.incrementAndGet() == 2) {
+                if (calls.incrementAndGet() == 3) {
                     throw failure;
                 }
                 return resultFor(invocation.getArgument(2));
             });
         Insert task = task(client, documents(205));
 
-        DocumentDBException thrown = assertThrows(
-            DocumentDBException.class,
+        IllegalStateException thrown = assertThrows(
+            IllegalStateException.class,
             () -> task.run(context(task))
         );
 
-        assertSame(failure, thrown);
-        verify(client, org.mockito.Mockito.times(2)).insertMany(anyString(), anyString(), anyList());
+        assertSame(failure, thrown.getCause());
+        assertTrue(thrown.getMessage().contains("200 documents were successfully inserted"));
+        assertTrue(thrown.getMessage().contains("batch 3 failed"));
+        verify(client, times(3)).insertMany(anyString(), anyString(), anyList());
         verify(client).close();
+    }
+
+    @Test
+    void shouldReturnZeroForEmptyStoredFromInput() throws Exception {
+        DocumentDBClient client = mock(DocumentDBClient.class);
+        Path emptyFile = Files.createTempFile("documentdb-empty-input", ".ion");
+        try {
+            Insert seedTask = task(client, List.of());
+            String inputUri = context(seedTask).storage().putFile(emptyFile.toFile()).toString();
+            Insert task = task(client, inputUri);
+
+            Insert.Output output = task.run(context(task));
+
+            assertEquals(0, output.getInsertedCount());
+            assertNull(output.getInsertedId());
+            assertEquals(List.of(), output.getInsertedIds());
+            verify(client, never()).insertMany(anyString(), anyString(), anyList());
+            verify(client).close();
+        } finally {
+            Files.deleteIfExists(emptyFile);
+        }
     }
 
     @Test
@@ -426,7 +446,7 @@ class InsertBatchTest {
                 .from(from)
                 .build()
         );
-        doReturn(client).when(task).createDocumentDBClient(anyString(), org.mockito.ArgumentMatchers.isNull());
+        doReturn(client).when(task).createDocumentDBClient(anyString(), isNull());
         return task;
     }
 
@@ -441,7 +461,7 @@ class InsertBatchTest {
                 .documents(Property.ofValue(input))
                 .build()
         );
-        doReturn(client).when(task).createDocumentDBClient(anyString(), org.mockito.ArgumentMatchers.isNull());
+        doReturn(client).when(task).createDocumentDBClient(anyString(), isNull());
         return task;
     }
 
@@ -460,7 +480,7 @@ class InsertBatchTest {
                 .documents(Property.ofValue(documents))
                 .build()
         );
-        doReturn(client).when(task).createDocumentDBClient(anyString(), org.mockito.ArgumentMatchers.isNull());
+        doReturn(client).when(task).createDocumentDBClient(anyString(), isNull());
         return task;
     }
 

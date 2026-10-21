@@ -103,9 +103,12 @@ public abstract class AbstractDocumentDBTask extends Task implements WorkerJobLi
         if (this.host != null && this.connectionString != null) {
             throw new IllegalArgumentException("Both deprecated 'host' and 'connectionString' are configured; remove 'host' and use 'connectionString'.");
         }
-        if (this.host != null) {
-            String legacyHost = runContext.render(this.host).as(String.class)
-                .orElseThrow(() -> new IllegalArgumentException("Unable to render the deprecated DocumentDB host."));
+        if (this.connectionString != null) {
+            return runContext.render(this.connectionString)
+                .as(String.class)
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Unable to render 'connectionString'; check the secret or expression it references."
+                ));
         }
         if (this.host != null) {
             String legacyHost = runContext.render(this.host).as(String.class)

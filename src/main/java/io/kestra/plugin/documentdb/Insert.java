@@ -158,16 +158,18 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
 
         boolean hasDocument = rDocument != null && !rDocument.isEmpty();
         boolean hasFrom = hasValue(rFrom);
+        boolean hasFromConfigured = this.from != null;
         boolean hasDocuments = rDocuments instanceof List<?> documents && !documents.isEmpty();
         int inputCount = (hasDocument ? 1 : 0) + (hasFrom ? 1 : 0) + (hasDocuments ? 1 : 0);
-        if (inputCount == 0) {
+        if (inputCount == 0 && !hasFromConfigured) {
             throw new IllegalArgumentException("No document to insert: set one of 'document', 'from', or 'documents'");
         }
         if (inputCount > 1) {
             throw new IllegalArgumentException("Cannot specify both 'document' and batch inputs; choose only one of 'document', 'from', or 'documents'");
         }
 
-        Object source = hasFrom ? rFrom : rDocuments;
+        boolean fromInput = hasFrom || (inputCount == 0 && hasFromConfigured);
+        Object source = fromInput ? rFrom : rDocuments;
         if (
             hasDocuments
                 && rDocuments instanceof List<?> list
@@ -195,7 +197,7 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
             }
 
             logger.info("Streaming document input into DocumentDB database: {} collection: {}", rDatabase, rCollection);
-            Output output = insertDocuments(Data.from(source).read(runContext), client, rDatabase, rCollection);
+            Output output = insertDocuments(Data.from(source).read(runContext), client, rDatabase, rCollection, !fromInput);
             logger.info("Successfully inserted {} documents", output.getInsertedCount());
             return output;
         });
@@ -206,9 +208,20 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
         DocumentDBClient client,
         String database,
         String collection) throws Exception {
+        return insertDocuments(records, client, database, collection, false);
+    }
+
+    private Output insertDocuments(
+        Flux<Map<String, Object>> records,
+        DocumentDBClient client,
+        String database,
+        String collection,
+        boolean collectAllIds) throws Exception {
 
         List<String> insertedIds = new ArrayList<>();
         int insertedCount = 0;
+        int batchNumber = 0;
+        String insertedId = null;
         AtomicBoolean cancelled = new AtomicBoolean();
 
         Stream<List<Map<String, Object>>> batches = records
@@ -225,16 +238,29 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
                 checkCancellation(cancelled);
 
                 List<Map<String, Object>> batch = iterator.next();
+                batchNumber++;
 
-                InsertResult result = client.insertMany(
-                    database,
-                    collection,
-                    batch
-                );
+                InsertResult result;
+                try {
+                    result = client.insertMany(database, collection, batch);
+                } catch (CancellationException e) {
+                    throw e;
+                } catch (Exception e) {
+                    throw new IllegalStateException(
+                        "Insert failed after " + insertedCount + " documents were successfully inserted; batch " + batchNumber
+                            + " failed: " + e.getMessage(),
+                        e
+                    );
+                }
 
                 checkCancellation(cancelled);
 
-                insertedIds.addAll(result.getInsertedIds());
+                if (insertedId == null && !result.getInsertedIds().isEmpty()) {
+                    insertedId = result.getInsertedIds().getFirst();
+                }
+                if (collectAllIds) {
+                    insertedIds.addAll(result.getInsertedIds());
+                }
                 insertedCount += result.getInsertedCount();
             }
 
@@ -245,18 +271,16 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
 
         checkIfKilled();
 
-        if (insertedCount == 0) {
-            throw new IllegalArgumentException(
-                "No document to insert: set one of 'document', 'from', or 'documents'"
-            );
+        if (!collectAllIds && insertedId != null) {
+            insertedIds.add(insertedId);
         }
 
-        return output(insertedIds, insertedCount);
+        return output(insertedId, insertedIds, insertedCount);
     }
 
-    private static Output output(List<String> insertedIds, Integer insertedCount) {
+    private static Output output(String insertedId, List<String> insertedIds, Integer insertedCount) {
         return Output.builder()
-            .insertedId(insertedIds.isEmpty() ? null : insertedIds.getFirst())
+            .insertedId(insertedId)
             .insertedIds(insertedIds)
             .insertedCount(insertedCount)
             .build();
@@ -293,7 +317,7 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
 
         @Schema(
             title = "Inserted document IDs",
-            description = "List of all document IDs acknowledged by DocumentDB."
+            description = "For bounded inputs, all IDs acknowledged by DocumentDB. For unrestricted 'from' inputs, only the first ID is returned to avoid unbounded output growth."
         )
         private final List<String> insertedIds;
 

@@ -146,7 +146,6 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
         Map<String, Object> rUpdate = runContext.render(this.update).asMap(String.class, Object.class);
         Boolean rUpdateMany = runContext.render(this.updateMany).as(Boolean.class).orElse(false);
 
-        // Validate update operations
         if (rUpdate == null || rUpdate.isEmpty()) {
             throw new IllegalArgumentException("Update operations must be provided");
         }
@@ -154,7 +153,6 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
         return withClient(rConnectionString, rCaCertificate, client ->
         {
             if (rUpdateMany) {
-                // Update multiple documents
                 logger.info("Updating multiple documents in DocumentDB database: {} collection: {}", rDatabase, rCollection);
 
                 UpdateResult result = client.updateMany(rDatabase, rCollection, rFilter, rUpdate);
@@ -167,7 +165,6 @@ public class Update extends AbstractDocumentDBTask implements RunnableTask<Updat
                     .upsertedId(result.getUpsertedId())
                     .build();
             } else {
-                // Update single document
                 logger.info("Updating single document in DocumentDB database: {} collection: {}", rDatabase, rCollection);
 
                 UpdateResult result = client.updateOne(rDatabase, rCollection, rFilter, rUpdate);

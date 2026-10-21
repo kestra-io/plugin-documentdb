@@ -131,4 +131,22 @@ class AbstractDocumentDBTaskPropertiesTest {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> task.resolveConnectionString(runContext));
         assertTrue(exception.getMessage().contains("not a MongoDB connection URI"));
     }
+
+    @Test
+    void missingConnectionConfigurationIsRejected() throws Exception {
+        Insert task = Insert.builder()
+            .id("missing-connection-property-test")
+            .type(Insert.class.getName())
+            .database(Property.ofValue("test_db"))
+            .collection(Property.ofValue("users"))
+            .build();
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> task.resolveConnectionString(runContext)
+        );
+
+        assertEquals("'connectionString' is required to connect to Amazon DocumentDB.", exception.getMessage());
+    }
 }

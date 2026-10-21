@@ -123,7 +123,6 @@ public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delet
         return withClient(rConnectionString, rCaCertificate, client ->
         {
             if (rDeleteMany) {
-                // Delete multiple documents
                 logger.info("Deleting multiple documents from DocumentDB database: {} collection: {}", rDatabase, rCollection);
 
                 DeleteResult result = client.deleteMany(rDatabase, rCollection, rFilter);
@@ -134,7 +133,6 @@ public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delet
                     .deletedCount(result.getDeletedCount())
                     .build();
             } else {
-                // Delete single document
                 logger.info("Deleting single document from DocumentDB database: {} collection: {}", rDatabase, rCollection);
 
                 DeleteResult result = client.deleteOne(rDatabase, rCollection, rFilter);

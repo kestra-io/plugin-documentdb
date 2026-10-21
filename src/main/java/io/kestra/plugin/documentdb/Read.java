@@ -279,7 +279,6 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
         return map;
     }
 
-    // Store records as an ION file in Kestra's internal storage.
     private StoredResult storeRecordsAsFile(
         RunContext runContext,
         MongoCursor<Document> cursor,
