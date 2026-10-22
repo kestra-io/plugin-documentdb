@@ -207,14 +207,6 @@ public class Insert extends AbstractDocumentDBTask implements RunnableTask<Inser
         Flux<Map<String, Object>> records,
         DocumentDBClient client,
         String database,
-        String collection) throws Exception {
-        return insertDocuments(records, client, database, collection, false);
-    }
-
-    private Output insertDocuments(
-        Flux<Map<String, Object>> records,
-        DocumentDBClient client,
-        String database,
         String collection,
         boolean collectAllIds) throws Exception {
 

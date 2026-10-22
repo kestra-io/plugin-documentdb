@@ -353,7 +353,7 @@ class InsertBatchTest {
         DocumentDBClient client = mockClientFor();
         Insert task = task(client, List.of());
 
-        Insert.Output output = task.insertDocuments(records, client, DATABASE, COLLECTION);
+        Insert.Output output = task.insertDocuments(records, client, DATABASE, COLLECTION, false);
 
         assertEquals(2, output.getInsertedCount());
         assertEquals(1, resourceCloseCount.get());
@@ -379,7 +379,7 @@ class InsertBatchTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         try {
-            Future<Insert.Output> insertion = executor.submit(() -> task.insertDocuments(records, client, DATABASE, COLLECTION));
+            Future<Insert.Output> insertion = executor.submit(() -> task.insertDocuments(records, client, DATABASE, COLLECTION, false));
             assertTrue(insertStarted.await(5, TimeUnit.SECONDS));
             task.kill();
             finishInsert.countDown();
@@ -413,7 +413,7 @@ class InsertBatchTest {
 
         assertThrows(
             CancellationException.class,
-            () -> task.insertDocuments(records, client, DATABASE, COLLECTION)
+            () -> task.insertDocuments(records, client, DATABASE, COLLECTION, false)
         );
 
         assertEquals(SignalType.ON_COMPLETE, cleanupSignal.get());
