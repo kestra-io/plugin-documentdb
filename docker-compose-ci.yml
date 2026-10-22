@@ -1,6 +1,5 @@
-version: '3.8'
 services:
-  # Using MongoDB with HTTP interface since DocumentDB is MongoDB-compatible
+  # MongoDB container for integration tests
   mongodb:
     image: mongo:7.0
     ports:
@@ -17,25 +16,6 @@ services:
       timeout: 5s
       retries: 30
       start_period: 30s
-
-  # DocumentDB HTTP API Gateway (simulates DocumentDB REST API)
-  documentdb-api:
-    image: python:3.11-slim
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    ports:
-      - "0.0.0.0:10260:10260"
-    volumes:
-      - ./api-server.py:/app/api-server.py:ro
-    working_dir: /app
-    command: >
-      sh -c "
-        pip install flask pymongo &&
-        python api-server.py
-      "
-    environment:
-      - MONGODB_URI=mongodb://testuser:testpass@mongodb:27017/test_db?authSource=admin
 
 volumes:
   mongodb-data:

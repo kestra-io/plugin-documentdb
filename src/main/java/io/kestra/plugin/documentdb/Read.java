@@ -1,23 +1,34 @@
 package io.kestra.plugin.documentdb;
 
-import java.io.BufferedWriter;
+import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URI;
+import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.bson.Document;
 import org.slf4j.Logger;
+
+import com.mongodb.MongoException;
+import com.mongodb.client.AggregateIterable;
+import com.mongodb.client.FindIterable;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.MongoIterable;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.common.FetchType;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.plugin.documentdb.models.DocumentDBException;
 import io.kestra.plugin.documentdb.models.DocumentDBRecord;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -29,7 +40,6 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
-import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -52,11 +62,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: find_users
                     type: io.kestra.plugin.documentdb.Read
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "{{ secret('DOCUMENTDB_CONNECTION_STRING') }}"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     fetchType: FETCH
                 """
         ),
@@ -70,11 +78,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: find_filtered_users
                     type: io.kestra.plugin.documentdb.Read
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "{{ secret('DOCUMENTDB_CONNECTION_STRING') }}"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     filter:
                       status: "active"
                       age:
@@ -93,11 +99,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: find_one_user
                     type: io.kestra.plugin.documentdb.Read
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "{{ secret('DOCUMENTDB_CONNECTION_STRING') }}"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     filter:
                       email: "john.doe@example.com"
                     fetchType: FETCH_ONE
@@ -113,11 +117,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: aggregate_users
                     type: io.kestra.plugin.documentdb.Read
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "{{ secret('DOCUMENTDB_CONNECTION_STRING') }}"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     aggregationPipeline:
                       - $match:
                           status: "active"
@@ -173,63 +175,94 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        Logger logger = runContext.logger();
+        String rConnectionString = resolveConnectionString(runContext);
+        String rCaCertificate = this.caCertificate == null ? null : runContext.render(this.caCertificate).as(String.class).orElse(null);
 
-        // Render properties
-        String rHost = runContext.render(this.host).as(String.class).orElseThrow();
-        String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
-        String rCollection = runContext.render(this.collection).as(String.class).orElseThrow();
-        String rUsername = runContext.render(this.username).as(String.class).orElseThrow();
-        String rPassword = runContext.render(this.password).as(String.class).orElseThrow();
+        return withClient(rConnectionString, rCaCertificate, client -> run(runContext, client));
+    }
+
+    Output run(RunContext runContext, DocumentDBClient client) throws Exception {
+        Logger logger = runContext.logger();
+        String rDatabase = runContext.render(this.database).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Unable to render the DocumentDB database name."));
+        String rCollection = renderCollection(runContext);
         Map<String, Object> rFilter = runContext.render(this.filter).asMap(String.class, Object.class);
         List<Map<String, Object>> rAggregationPipeline = runContext.render(this.aggregationPipeline).asList(Map.class);
         Integer rLimit = runContext.render(this.limit).as(Integer.class).orElse(null);
         Integer rSkip = runContext.render(this.skip).as(Integer.class).orElse(null);
         FetchType rFetchType = runContext.render(this.fetchType).as(FetchType.class).orElse(FetchType.FETCH);
+        Output.OutputBuilder outputBuilder = Output.builder();
 
-        DocumentDBClient client = new DocumentDBClient(rHost, rUsername, rPassword, runContext);
+        boolean aggregation = rAggregationPipeline != null && !rAggregationPipeline.isEmpty();
+        boolean canCountOnServer = (rLimit == null || rLimit >= 0) && (rSkip == null || rSkip >= 0);
+        if (rFetchType == FetchType.NONE && !aggregation && canCountOnServer) {
+            logger.info("Counting documents in DocumentDB database: {} collection: {}", rDatabase, rCollection);
+            outputBuilder.size(client.countDocuments(rDatabase, rCollection, rFilter, rLimit, rSkip));
+            return outputBuilder.build();
+        }
 
-        List<DocumentDBRecord> records;
-
-        if (rAggregationPipeline != null && !rAggregationPipeline.isEmpty()) {
-            // Execute aggregation
+        MongoIterable<Document> results;
+        if (aggregation) {
             logger.info(
                 "Executing aggregation pipeline on DocumentDB database: {} collection: {} with {} stages",
                 rDatabase, rCollection, rAggregationPipeline.size()
             );
-            records = client.aggregate(rDatabase, rCollection, rAggregationPipeline);
+            AggregateIterable<Document> aggregate = client.aggregateIterable(
+                rDatabase,
+                rCollection,
+                rAggregationPipeline
+            );
+            results = aggregate;
         } else {
-            // Execute find
             logger.info("Finding documents in DocumentDB database: {} collection: {}", rDatabase, rCollection);
-            records = client.find(rDatabase, rCollection, rFilter, rLimit, rSkip);
+            FindIterable<Document> find = client.findIterable(rDatabase, rCollection, rFilter, rLimit, rSkip);
+            if (rFetchType == FetchType.FETCH_ONE) {
+                find.limit(1);
+            }
+            results = find;
         }
 
-        logger.info("Found {} documents", records.size());
-
-        // Handle fetchType logic and build output in single switch
-        int recordCount = records.size();
-        Output.OutputBuilder outputBuilder = Output.builder();
-
-        switch (rFetchType) {
-            case FETCH_ONE:
-                Map<String, Object> row = records.isEmpty() ? null : convertRecordToMap(records.getFirst());
-                recordCount = records.isEmpty() ? 0 : 1;
-                outputBuilder.size((long) recordCount).row(row);
-                break;
-            case NONE:
-                outputBuilder.size((long) recordCount);
-                break;
-            case STORE:
-                StoredResult storedResult = storeRecordsAsFile(runContext, records);
-                outputBuilder.size((long) recordCount).uri(storedResult.getUri());
-                break;
-            case FETCH:
-            default:
-                List<Map<String, Object>> rows = records.stream()
-                    .map(this::convertRecordToMap)
-                    .toList();
-                outputBuilder.size((long) recordCount).rows(rows);
-                break;
+        try {
+            if (rFetchType == FetchType.FETCH_ONE) {
+                Map<String, Object> row = withCursor(
+                    results.iterator(), cursor -> cursor.hasNext()
+                        ? convertRecordToMap(client.toRecord(cursor.next()))
+                        : null
+                );
+                outputBuilder.size(row == null ? 0L : 1L).row(row);
+            } else if (rFetchType == FetchType.STORE) {
+                StoredResult storedResult = withCursor(
+                    results.iterator(),
+                    cursor -> storeRecordsAsFile(runContext, cursor, client)
+                );
+                outputBuilder.size(storedResult.getCount()).uri(storedResult.getUri());
+            } else if (rFetchType == FetchType.NONE) {
+                long count = withCursor(results.iterator(), cursor ->
+                {
+                    long resultCount = 0;
+                    while (cursor.hasNext()) {
+                        cursor.next();
+                        resultCount++;
+                    }
+                    return resultCount;
+                });
+                outputBuilder.size(count);
+            } else {
+                List<Map<String, Object>> rows = withCursor(results.iterator(), cursor ->
+                {
+                    List<Map<String, Object>> collectedRows = new ArrayList<>();
+                    while (cursor.hasNext()) {
+                        collectedRows.add(convertRecordToMap(client.toRecord(cursor.next())));
+                    }
+                    return collectedRows;
+                });
+                outputBuilder.size((long) rows.size()).rows(rows);
+            }
+        } catch (MongoException e) {
+            String message = aggregation
+                ? "Failed to execute aggregation: "
+                : "Failed to find documents: ";
+            throw new DocumentDBException(message + e.getMessage(), e);
         }
 
         return outputBuilder.build();
@@ -246,41 +279,48 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
         return map;
     }
 
-    /**
-     * Store records as an ION file in Kestra's internal storage.
-     * Returns a StoredResult containing both the URI and record count.
-     */
-    private StoredResult storeRecordsAsFile(RunContext runContext, List<DocumentDBRecord> records) throws IOException {
+    private StoredResult storeRecordsAsFile(
+        RunContext runContext,
+        MongoCursor<Document> cursor,
+        DocumentDBClient client) throws IOException {
+        File tempFile;
+        long count;
+
         try {
-            // Create a temporary file for Ion format
-            File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
+            tempFile = runContext.workingDir().createTempFile(".ion").toFile();
+            try (
+                OutputStream outputStream = new BufferedOutputStream(
+                    Files.newOutputStream(tempFile.toPath()),
+                    FileSerde.BUFFER_SIZE
+                )
+            ) {
+                Flux<Map<String, Object>> recordFlux = Flux.<Map<String, Object>> generate(sink ->
+                {
+                    if (cursor.hasNext()) {
+                        sink.next(convertRecordToMap(client.toRecord(cursor.next())));
+                    } else {
+                        sink.complete();
+                    }
+                });
 
-            // Stream records via Flux and write to file using FileSerde
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)) {
-                Flux<Map<String, Object>> recordFlux = Flux.fromIterable(records)
-                    .map(this::convertRecordToMap);
-
-                Long count = FileSerde.writeAll(writer, recordFlux).block();
-
-                // Store the temporary file in Kestra's internal storage
-                URI storedFileUri = runContext.storage().putFile(tempFile);
-
-                return new StoredResult(storedFileUri, count != null ? count.intValue() : 0);
+                    count = FileSerde.writeAll(outputStream, recordFlux)
+                        .blockOptional()
+                        .orElseThrow(() -> new IllegalStateException(
+                        "Failed to determine the number of records written to the ION file."
+                    ));
             }
-
         } catch (IOException e) {
             throw new IOException("Failed to store records as Ion file: " + e.getMessage(), e);
         }
-    }
 
-    /**
-     * Helper class to return both URI and count for STORE operations.
-     */
+        URI storedFileUri = runContext.storage().putFile(tempFile);
+        return new StoredResult(storedFileUri, count);
+    }
     private static class StoredResult {
         private final URI uri;
-        private final int count;
+        private final long count;
 
-        StoredResult(URI uri, int count) {
+        StoredResult(URI uri, long count) {
             this.uri = uri;
             this.count = count;
         }
@@ -289,7 +329,7 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
             return uri;
         }
 
-        public int getCount() {
+        public long getCount() {
             return count;
         }
     }
@@ -317,7 +357,7 @@ public class Read extends AbstractDocumentDBTask implements RunnableTask<Read.Ou
 
         @Schema(
             title = "Returned document count",
-            description = "Number of documents fetched or stored."
+            description = "Number of documents returned by the query, including when fetchType is NONE and results are not output."
         )
         private final Long size;
     }

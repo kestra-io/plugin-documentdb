@@ -1,17 +1,42 @@
 # How to use the DocumentDB plugin
 
-Read and write documents in DocumentDB — the open-source, MongoDB-compatible document database (built on PostgreSQL) — from Kestra flows, via its HTTP data API.
+The plugin connects to Amazon DocumentDB and uses the MongoDB Java synchronous driver as its client library. It is a DocumentDB plugin; the driver provides the MongoDB-compatible wire protocol used to communicate with the database.
 
 ## Authentication
 
-Set `host` (required, the HTTPS endpoint), `username` (required), and `password` (required) on every task, along with `database` and `collection`. Authentication uses HTTP Basic auth. Store secrets in [secrets](https://kestra.io/docs/concepts/secret) and set connection properties on each task.
+Use `connectionString` and `database` to connect to Amazon DocumentDB. `connectionString` is the recommended connection configuration and should be stored in a Kestra [secret](https://kestra.io/docs/concepts/secret). For shared task configuration, see [plugin defaults](https://kestra.io/docs/1.3/workflow-components/plugin-defaults). The old `host`, `username`, and `password` properties are deprecated and retained in task configuration. The MongoDB Java Driver does not use the old HTTP Basic-auth credentials, and an HTTPS API endpoint is not a MongoDB URI. Existing workflows that use the old HTTP endpoint must migrate to `connectionString`; preserving that HTTP transport would require a separate legacy implementation. A legacy `host` is accepted by the driver path only if it is already a `mongodb://` or `mongodb+srv://` URI. Supplying both `host` and `connectionString` is rejected as ambiguous.
+
+Set `connectionString` to an Amazon DocumentDB connection URI consumed by the MongoDB Java Driver, for example `mongodb://<username>:<password>@<cluster-endpoint>:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false`. Replace the placeholders with your cluster details; do not put credentials directly in workflow definitions. Store the URI in a Kestra secret and reference it with `{{ secret('DOCUMENTDB_CONNECTION_STRING') }}`. If the deprecated `username` or `password` property is also set, it is ignored and a warning is logged; move the credentials into the URI.
+
+For Amazon DocumentDB engine versions earlier than 8.0.2, set `retryWrites=false` in the URI. Enable TLS with `tls=true` for Amazon DocumentDB clusters.
+
+`caCertificate` is optional. Provide one or more PEM-encoded X.509 certificates to enable TLS with a trust store containing every certificate in the bundle. TLS options such as `tls=true` can also be configured in the DocumentDB connection URI.
 
 ## Tasks
 
-`Read` queries documents from a collection — optionally set `filter` (MongoDB-style filter object) and `limit`/`skip` for pagination. Use `aggregationPipeline` instead of `filter` to run an aggregation (when set, it overrides `filter`, `skip`, and `limit`). Set `fetchType` (default `FETCH`) to control output: `FETCH` returns all rows in `rows`, `FETCH_ONE` returns a single row in `row`, `STORE` writes to internal storage and returns a `uri`. The output also includes `size`.
+### Read
 
-`Insert` inserts one or more documents — set either `document` (a single map) or `documents` (a list, max 10 per call). The output includes `insertedId`, `insertedIds`, and `insertedCount`.
+`Read` accepts an optional MongoDB `filter`, `limit`, and `skip`, or an `aggregationPipeline`. A non-empty aggregation pipeline takes precedence over the find filter, limit, and skip. `fetchType` defaults to `FETCH`.
 
-`Update` updates documents matching a `filter` — set `update` (required, MongoDB update operators such as `$set`, `$inc`). Set `updateMany: true` to update all matches (default `false`, updates only the first). The output includes `matchedCount`, `modifiedCount`, and `upsertedId`.
+- `FETCH` returns all matching rows in `rows` and sets `size` to the number fetched.
+- `FETCH_ONE` returns the first result in `row` and sets `size` to `0` or `1`. For ordinary find queries, it applies a server-side limit of one. For aggregation queries, it consumes only the first result without modifying the aggregation pipeline.
+- `STORE` streams rows to an Ion file in Kestra internal storage, returns its `uri`, and sets `size` to the number stored.
+- `NONE` returns no rows or URI and sets `size` to the number of query results. Find queries use a server-side count with the filter, skip, and limit applied; aggregation queries count rows emitted by the pipeline.
 
-`Delete` deletes documents matching a `filter` — set `deleteMany: true` to delete all matches (default `false`, deletes only the first). The output includes `deletedCount`.
+### Insert
+
+`Insert` accepts exactly one of:
+
+- `document`: one document map.
+- `from`: structured data provided as a map, a list of maps, a JSON string, or a Kestra-supported URI (`kestra://`, `file://`, or `nsfile://`).
+- `documents`: the legacy inline list-of-maps input.
+
+`document` inserts one document. Input through `from` is streamed and inserted in batches of up to 100 documents, including Kestra-supported URIs. The legacy `documents` property remains limited to 10 documents. Outputs contain `insertedId` (the first returned ID, or `null` when none), `insertedIds`, and `insertedCount` (the acknowledged count). For `document` and `documents`, `insertedIds` lists every acknowledged ID in input order. For `from`, it holds only the first ID so the output does not grow with the input size; use `insertedCount` to check how many documents were written. An empty `from` input succeeds with `insertedCount: 0` and an empty `insertedIds`. If a batch fails, earlier batches or earlier operations within that batch may already have been written; the task fails without returning partial-success output, and the error message reports how many documents were inserted before the failing batch.
+
+### Update
+
+`Update` accepts an optional `filter`, a required `update` document (for example, `$set` or `$inc`), and `updateMany`, which defaults to `false`. The output contains `matchedCount`, `modifiedCount`, and `upsertedId`.
+
+### Delete
+
+`Delete` accepts an optional `filter` and `deleteMany`, which defaults to `false`. An empty filter with `deleteMany: true` affects every document in the collection. The output contains `deletedCount`.

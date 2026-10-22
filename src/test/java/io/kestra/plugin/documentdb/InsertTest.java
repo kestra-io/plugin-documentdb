@@ -8,6 +8,10 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -22,15 +26,15 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 @KestraTest
+@Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class InsertTest {
 
-    // Real connection details for local DocumentDB container
-    private static final String HOST = "http://localhost:10260";
+    @Container
+    private static final MongoDBContainer MONGODB = new MongoDBContainer(DockerImageName.parse("mongo:7.0.14"));
     private static final String DATABASE = "test_db";
+    private static final String INVALID_CONNECTION_STRING = "mongodb://127.0.0.1:1/test_db?serverSelectionTimeoutMS=1000&connectTimeoutMS=1000";
     private static final String COLLECTION = "integration_test";
-    private static final String USERNAME = "testuser";
-    private static final String PASSWORD = "testpass";
 
     @Inject
     private RunContextFactory runContextFactory;
@@ -40,22 +44,18 @@ class InsertTest {
         Insert task = Insert.builder()
             .id("test-insert")
             .type(Insert.class.getName())
-            .host(Property.ofValue("https://test-documentdb.com"))
+            .connectionString(Property.ofValue(INVALID_CONNECTION_STRING))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
-            .username(Property.ofValue("testuser"))
-            .password(Property.ofValue("testpass"))
             .document(Property.ofValue(Map.of("name", "Test Document")))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
         // This should not throw an exception for validation
-        assertThat(task.getHost(), is(notNullValue()));
+        assertThat(task.getConnectionString(), is(notNullValue()));
         assertThat(task.getDatabase(), is(notNullValue()));
         assertThat(task.getCollection(), is(notNullValue()));
-        assertThat(task.getUsername(), is(notNullValue()));
-        assertThat(task.getPassword(), is(notNullValue()));
 
         // Task should fail with connection error since this unit test uses a non-existent host
         // but this validates that the task configuration is valid
@@ -81,11 +81,9 @@ class InsertTest {
         Insert task = Insert.builder()
             .id("test-reject-both")
             .type(Insert.class.getName())
-            .host(Property.ofValue("https://test-documentdb.com"))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
-            .username(Property.ofValue("testuser"))
-            .password(Property.ofValue("testpass"))
             .document(Property.ofValue(Map.of("name", "Test Document")))
             .documents(Property.ofValue(List.of(Map.of("name", "Test Document 2"))))
             .build();
@@ -105,11 +103,9 @@ class InsertTest {
         Insert task = Insert.builder()
             .id("test-reject-neither")
             .type(Insert.class.getName())
-            .host(Property.ofValue("https://test-documentdb.com"))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
-            .username(Property.ofValue("testuser"))
-            .password(Property.ofValue("testpass"))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
@@ -118,37 +114,10 @@ class InsertTest {
             task.run(runContext);
             throw new AssertionError("Should have thrown IllegalArgumentException");
         } catch (IllegalArgumentException e) {
-            assertThat(e.getMessage(), containsString("must be provided"));
-        }
-    }
-
-    @Test
-    void shouldRejectTooManyDocuments() throws Exception {
-        List<Map<String, Object>> tooManyDocs = List.of(
-            Map.of("name", "Doc1"), Map.of("name", "Doc2"), Map.of("name", "Doc3"),
-            Map.of("name", "Doc4"), Map.of("name", "Doc5"), Map.of("name", "Doc6"),
-            Map.of("name", "Doc7"), Map.of("name", "Doc8"), Map.of("name", "Doc9"),
-            Map.of("name", "Doc10"), Map.of("name", "Doc11") // 11 documents - exceeds limit
-        );
-
-        Insert task = Insert.builder()
-            .id("test-too-many")
-            .type(Insert.class.getName())
-            .host(Property.ofValue("https://test-documentdb.com"))
-            .database(Property.ofValue("testdb"))
-            .collection(Property.ofValue("testcol"))
-            .username(Property.ofValue("testuser"))
-            .password(Property.ofValue("testpass"))
-            .documents(Property.ofValue(tooManyDocs))
-            .build();
-
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
-
-        try {
-            task.run(runContext);
-            throw new AssertionError("Should have thrown IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            assertThat(e.getMessage(), containsString("Cannot insert more than"));
+            assertThat(
+                e.getMessage(),
+                is("No document to insert: set one of 'document', 'from', or 'documents'")
+            );
         }
     }
 
@@ -159,11 +128,9 @@ class InsertTest {
         Insert insertTask = Insert.builder()
             .id("insert-single-integration-test")
             .type(Insert.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .document(
                 Property.ofValue(
                     Map.of(
@@ -192,11 +159,9 @@ class InsertTest {
         Insert insertTask = Insert.builder()
             .id("insert-multiple-integration-test")
             .type(Insert.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .documents(
                 Property.ofValue(
                     List.of(
@@ -226,11 +191,9 @@ class InsertTest {
         Insert insertTask = Insert.builder()
             .id("insert-verify-integration-test")
             .type(Insert.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .document(
                 Property.ofValue(
                     Map.of(
@@ -256,11 +219,9 @@ class InsertTest {
         Read readTask = Read.builder()
             .id("read-verify-integration-test")
             .type(Read.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(Map.of("_id", insertedId)))
             .fetchType(Property.ofValue(FetchType.FETCH_ONE))
             .build();

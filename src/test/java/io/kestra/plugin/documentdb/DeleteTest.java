@@ -8,6 +8,10 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -21,15 +25,15 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 @KestraTest
+@Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DeleteTest {
 
-    // Real connection details for local DocumentDB container
-    private static final String HOST = "http://localhost:10260";
+    @Container
+    private static final MongoDBContainer MONGODB = new MongoDBContainer(DockerImageName.parse("mongo:7.0.14"));
     private static final String DATABASE = "test_db";
+    private static final String INVALID_CONNECTION_STRING = "mongodb://127.0.0.1:1/test_db?serverSelectionTimeoutMS=1000&connectTimeoutMS=1000";
     private static final String COLLECTION = "delete_test";
-    private static final String USERNAME = "testuser";
-    private static final String PASSWORD = "testpass";
 
     @Inject
     private RunContextFactory runContextFactory;
@@ -39,22 +43,18 @@ class DeleteTest {
         Delete task = Delete.builder()
             .id("test-delete")
             .type(Delete.class.getName())
-            .host(Property.ofValue("https://test-documentdb.com"))
+            .connectionString(Property.ofValue(INVALID_CONNECTION_STRING))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
-            .username(Property.ofValue("testuser"))
-            .password(Property.ofValue("testpass"))
             .filter(Property.ofValue(Map.of("name", "Test Document")))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, Map.of());
 
         // This should not throw an exception for validation
-        assertThat(task.getHost(), is(notNullValue()));
+        assertThat(task.getConnectionString(), is(notNullValue()));
         assertThat(task.getDatabase(), is(notNullValue()));
         assertThat(task.getCollection(), is(notNullValue()));
-        assertThat(task.getUsername(), is(notNullValue()));
-        assertThat(task.getPassword(), is(notNullValue()));
         assertThat(task.getFilter(), is(notNullValue()));
 
         // Task should fail with connection error since this unit test uses a non-existent host
@@ -81,11 +81,9 @@ class DeleteTest {
         Delete task = Delete.builder()
             .id("test-delete-many")
             .type(Delete.class.getName())
-            .host(Property.ofValue("https://test-documentdb.com"))
+            .connectionString(Property.ofValue(INVALID_CONNECTION_STRING))
             .database(Property.ofValue("testdb"))
             .collection(Property.ofValue("testcol"))
-            .username(Property.ofValue("testuser"))
-            .password(Property.ofValue("testpass"))
             .filter(Property.ofValue(Map.of("status", "to_delete")))
             .deleteMany(Property.ofValue(true))
             .build();
@@ -121,11 +119,9 @@ class DeleteTest {
         Insert insertTask = Insert.builder()
             .id("setup-delete-test")
             .type(Insert.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .document(
                 Property.ofValue(
                     Map.of(
@@ -146,11 +142,9 @@ class DeleteTest {
         Delete deleteTask = Delete.builder()
             .id("delete-single-integration-test")
             .type(Delete.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(Map.of("_id", docId)))
             .deleteMany(Property.ofValue(false))
             .build();
@@ -169,11 +163,9 @@ class DeleteTest {
         Insert insertTask = Insert.builder()
             .id("setup-delete-many-test")
             .type(Insert.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .documents(
                 Property.ofValue(
                     List.of(
@@ -192,11 +184,9 @@ class DeleteTest {
         Delete deleteTask = Delete.builder()
             .id("delete-many-integration-test")
             .type(Delete.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(Map.of("category", "cleanup-test")))
             .deleteMany(Property.ofValue(true))
             .build();
@@ -214,11 +204,9 @@ class DeleteTest {
         Delete deleteTask = Delete.builder()
             .id("delete-no-match-test")
             .type(Delete.class.getName())
-            .host(Property.ofValue(HOST))
+            .connectionString(Property.ofValue(MONGODB.getConnectionString()))
             .database(Property.ofValue(DATABASE))
             .collection(Property.ofValue(COLLECTION))
-            .username(Property.ofValue(USERNAME))
-            .password(Property.ofValue(PASSWORD))
             .filter(Property.ofValue(Map.of("_id", "non-existent-document-" + System.currentTimeMillis())))
             .deleteMany(Property.ofValue(false))
             .build();

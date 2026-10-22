@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
@@ -18,7 +19,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -41,11 +41,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: delete_user
                     type: io.kestra.plugin.documentdb.Delete
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "{{ secret('DOCUMENTDB_CONNECTION_STRING') }}"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     filter:
                       email: "user.to.delete@example.com"
                     deleteMany: false
@@ -61,11 +59,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: delete_inactive_users
                     type: io.kestra.plugin.documentdb.Delete
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "{{ secret('DOCUMENTDB_CONNECTION_STRING') }}"
                     database: "myapp"
                     collection: "users"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     filter:
                       status: "inactive"
                       last_login:
@@ -83,11 +79,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                 tasks:
                   - id: cleanup_old_logs
                     type: io.kestra.plugin.documentdb.Delete
-                    host: "https://my-documentdb-instance.com"
+                    connectionString: "{{ secret('DOCUMENTDB_CONNECTION_STRING') }}"
                     database: "logging"
                     collection: "application_logs"
-                    username: "{{ secret('DOCUMENTDB_USERNAME') }}"
-                    password: "{{ secret('DOCUMENTDB_PASSWORD') }}"
                     filter:
                       created_at:
                         $lt: "{{ now() | dateAdd(-30, 'DAYS') }}"
@@ -118,45 +112,42 @@ public class Delete extends AbstractDocumentDBTask implements RunnableTask<Delet
     @Override
     public Output run(RunContext runContext) throws Exception {
         Logger logger = runContext.logger();
-
-        // Render properties
-        String rHost = runContext.render(this.host).as(String.class).orElseThrow();
-        String rDatabase = runContext.render(this.database).as(String.class).orElseThrow();
-        String rCollection = runContext.render(this.collection).as(String.class).orElseThrow();
-        String rUsername = runContext.render(this.username).as(String.class).orElseThrow();
-        String rPassword = runContext.render(this.password).as(String.class).orElseThrow();
+        String rConnectionString = resolveConnectionString(runContext);
+        String rCaCertificate = this.caCertificate == null ? null : runContext.render(this.caCertificate).as(String.class).orElse(null);
+        String rDatabase = runContext.render(this.database).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Unable to render the DocumentDB database name."));
+        String rCollection = renderCollection(runContext);
         Map<String, Object> rFilter = runContext.render(this.filter).asMap(String.class, Object.class);
         Boolean rDeleteMany = runContext.render(this.deleteMany).as(Boolean.class).orElse(false);
 
-        DocumentDBClient client = new DocumentDBClient(rHost, rUsername, rPassword, runContext);
+        return withClient(rConnectionString, rCaCertificate, client ->
+        {
+            if (rDeleteMany) {
+                logger.info("Deleting multiple documents from DocumentDB database: {} collection: {}", rDatabase, rCollection);
 
-        if (rDeleteMany) {
-            // Delete multiple documents
-            logger.info("Deleting multiple documents from DocumentDB database: {} collection: {}", rDatabase, rCollection);
+                DeleteResult result = client.deleteMany(rDatabase, rCollection, rFilter);
 
-            DeleteResult result = client.deleteMany(rDatabase, rCollection, rFilter);
+                logger.info("Successfully deleted {} documents", result.getDeletedCount());
 
-            logger.info("Successfully deleted {} documents", result.getDeletedCount());
-
-            return Output.builder()
-                .deletedCount(result.getDeletedCount())
-                .build();
-        } else {
-            // Delete single document
-            logger.info("Deleting single document from DocumentDB database: {} collection: {}", rDatabase, rCollection);
-
-            DeleteResult result = client.deleteOne(rDatabase, rCollection, rFilter);
-
-            if (result.getDeletedCount() > 0) {
-                logger.info("Successfully deleted {} document", result.getDeletedCount());
+                return Output.builder()
+                    .deletedCount(result.getDeletedCount())
+                    .build();
             } else {
-                logger.info("No documents matched the filter criteria for deletion");
-            }
+                logger.info("Deleting single document from DocumentDB database: {} collection: {}", rDatabase, rCollection);
 
-            return Output.builder()
-                .deletedCount(result.getDeletedCount())
-                .build();
-        }
+                DeleteResult result = client.deleteOne(rDatabase, rCollection, rFilter);
+
+                if (result.getDeletedCount() > 0) {
+                    logger.info("Successfully deleted {} document", result.getDeletedCount());
+                } else {
+                    logger.info("No documents matched the filter criteria for deletion");
+                }
+
+                return Output.builder()
+                    .deletedCount(result.getDeletedCount())
+                    .build();
+            }
+        });
     }
 
     @Builder
