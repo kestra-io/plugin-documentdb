@@ -43,7 +43,7 @@ dependencies {
     implementation enforcedPlatform("io.kestra:platform:$kestraVersion")
 
     // MongoDB driver
-    implementation "org.mongodb:mongodb-driver-sync:5.5.1"
+    implementation "org.mongodb:mongodb-driver-sync:5.13.0"
 
     // lombok
     annotationProcessor "org.projectlombok:lombok"
